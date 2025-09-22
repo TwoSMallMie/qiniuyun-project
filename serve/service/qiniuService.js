@@ -31,7 +31,7 @@ async function chatModel({ chatText, stream = false, search = false, res = null 
         // 构造请求体
         const postData = {
             "messages": [{"role": "user", "content": chatText}],
-            "model": "deepseek-v3",
+            "model": "deepseek/deepseek-v3.1-terminus" + (search ? "?search" : ""),
         };
         if (stream) postData.stream = true;
 
@@ -45,10 +45,12 @@ async function chatModel({ chatText, stream = false, search = false, res = null 
         if (stream) axiosConfig.responseType = 'stream';
 
         //拼接请求
-        const url = QINIU_MODEL_API_URL + '/chat/completions' + (search ? '?search' : '');
+        const url = QINIU_MODEL_API_URL + '/chat/completions';
 
         // 发送请求
         console.log('发送了请求', url);
+        console.log('请求参数', postData);
+        console.log('是否流式输出', stream, '是否联网', search);
         const response = await axios.post(
             url,
             postData,

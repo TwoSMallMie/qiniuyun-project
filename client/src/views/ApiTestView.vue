@@ -11,8 +11,8 @@
     <button @click="testQiniuModel">测试获取七牛云模型</button>
     <br />
     
-    <button @click="testQiniuChat">测试七牛云模型推理</button>
-    <div>
+    <!-- <button @click="testQiniuChat">测试七牛云模型推理</button> -->
+    <!-- <div>
       <label>聊天内容：</label>
       <input v-model="chatText" placeholder="请输入聊天内容" style="width:300px" />
       <button
@@ -29,25 +29,45 @@
     <div>
       <label>返回内容：</label>
       <textarea :value="chatResult" readonly style="width:500px; height:200px; background:#f5f5f5; color:#333; border:1px solid #ccc;"></textarea>
-    </div>
+    </div> -->
+    <MultiLineInput v-model="chatText" :submitType="submitType" @submit="submitChat"></MultiLineInput>
+    <p>{{ chatResult }}</p>
   </div>
 </template>
 
 <script>
 import axios from 'axios';
 
+import MultiLineInput from '@/components/MultiLineInput.vue';
+
 export default {
   name: 'ApiTestView',
+  components: {
+    MultiLineInput,
+  },
   data() {
     return {
       qiniuToken: 'sk-662551935711197f0bb7d54dbbe73d31cb8a51ab2c97966870f63282ebe1ee99',
-      chatText: '你是谁',
+      chatText: '你是谁，今天是几年几月几号',
       chatResult: '',
+      chatReader: null,
+      chatAbortController: null,
+      isChat: false,
       isStream: true,
-      isSearch: false,
+      isSearch: true,
     };
   },
+  computed: {
+    submitType() {
+      return this.isChat ? 'pause' : 'submit';
+    }
+  },
   methods: {
+    initChatData() {
+      this.isChat = false; // 标记为未在聊天
+      this.chatReader = null; // 清除读取器
+      this.chatAbortController = null; // 清除取消控制器
+    },
     async callApi() {
       try {
         const res = await axios.get('http://localhost:3000/api/hello');
@@ -75,19 +95,33 @@ export default {
     },
     async testQiniuChat() {
       this.chatResult = ''; // 清空之前回答的结果
+      this.isChat = true; // 标记为正在聊天
       
       // isStream为true，进行流式输出
       if (this.isStream) {
-        // 流式请求
-        const response = await fetch('http://localhost:3000/api/qiniu/chat-stream', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ chatText: this.chatText, search: this.isSearch })
-        });
+        this.chatAbortController = new AbortController(); // 创建取消控制器
+        let response; // 保存响应对象
 
-        // 处理是否为流式响应
+        // 进行请求
+        try {
+          response = await fetch('http://localhost:3000/api/qiniu/chat-stream', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ chatText: this.chatText, search: this.isSearch }),
+            signal: this.chatAbortController.signal
+          });
+        } 
+        catch (err) {
+          if (err.name === 'AbortError') {
+            console.log('请求已取消');
+            return;
+          }
+          throw err;
+        }
+
+        // 检查响应状态
         if (!response.body) {
           console.error('无流式响应');
           return;
@@ -95,52 +129,82 @@ export default {
 
         // 处理流式响应
         const reader = response.body.getReader(); // 获取流式读取器
+        this.chatReader = reader; // 保存读取器以便后续可能的取消
         const decoder = new TextDecoder(); // 文本解码器
         let done = true; // 标记读取是否完成
 
         // 读取流式数据
         while(done) {
-          const { value } = await reader.read(); // 读取数据块
+          // 读取过程中若isChat变为false，停止读取
+          if (!this.isChat) {
+            done = false;
+            break;
+          }
 
-          // value是Uint8Array类型，需要解码为字符串
+          // 读取数据
+          const { value } = await reader.read();
+
+          // 处理读取到的数据块
           if (value) {
             const decode = decoder.decode(value); // 解码字符串
             const blocks = decode.split('data:').map(block => block.trim()).filter(block => block); // 按"data:"分割成块
-          
+            
+            // 处理每个块
             for (let block of blocks) {
-              if (block) {
-                // 流式数据以"[DONE]"结尾，表示结束
-                if (block === '[DONE]') {
-                  done = false;
-                  break;
-                }
-
-                // 流式数据是JSON格式，需要解析
-                try {
-                  const obj = JSON.parse(block); // 解析JSON
-                  this.chatResult = this.chatResult.concat(obj.choices[0].delta.content || ''); // 累加回答内容
-                } catch (err) {
-                  // 非完整JSON块时报错
-                  console.error('非完整JSON块:', block);
-                  done = false;  
-                  break;           
-                }
+              if (block === '[DONE]' || !this.isChat) {
+                done = false;
+                break;
+              }
+              try {
+                // 解析JSON块为对象
+                const obj = JSON.parse(block);
+                // 拼接回答内容
+                this.chatResult = this.chatResult.concat(obj.choices[0].delta.content || '');
+              } catch (err) {
+                console.error('非完整JSON块:', block);
+                done = false;
+                break;
               }
             }
           }
         }
-      } else {
-        // 普通请求 
-        try {
-          const res = await axios.post('http://localhost:3000/api/qiniu/chat', {
-            chatText: this.chatText,
-            search: this.isSearch,
-          });
-          console.log(res.data);
-          this.chatResult = res.data.choices?.[0]?.message?.content || '';
-        } catch (e) {
-          console.error('普通请求失败', e.response?.data?.error || e.message);
+      }
+      // else {
+      //   // 普通请求 
+      //   try {
+      //     const res = await axios.post('http://localhost:3000/api/qiniu/chat', {
+      //       chatText: this.chatText,
+      //       search: this.isSearch,
+      //     });
+      //     console.log(res.data);
+      //     this.chatResult = res.data.choices?.[0]?.message?.content || '';
+      //   } catch (e) {
+      //     console.error('普通请求失败', e.response?.data?.error || e.message);
+      //   }
+      // }
+
+      // 聊天结束，重置状态
+      this.initChatData();
+    },
+    submitChat() {
+      // 如果正在聊天，则停止请求
+      if (this.isChat) {
+        // 若已建立了读取器，取消流式读取
+        if (this.chatReader) {
+          this.chatReader.cancel();
         }
+
+        // 取消请求
+        if (this.chatAbortController) {
+          this.chatAbortController.abort();
+        }
+
+        // 重置聊天状态
+        this.initChatData();
+      }
+      // 未在聊天在则开始聊天
+      else {
+        this.testQiniuChat();
       }
     },
     toggleStream() {
