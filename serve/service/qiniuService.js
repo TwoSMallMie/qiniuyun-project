@@ -19,8 +19,9 @@ async function getModel() {
     }
 }
 
-// 合并推理与流式推理
-async function chatModel(chatText, stream = false, res = null) {
+// 模型推理
+// 参数为对象形式: { chatText, stream, search, res }
+async function chatModel({ chatText, stream = false, search = false, res = null }) {
     try {
         // 流式请求必须提供res参数
         if (stream && !res) {
@@ -43,9 +44,13 @@ async function chatModel(chatText, stream = false, res = null) {
         };
         if (stream) axiosConfig.responseType = 'stream';
 
+        //拼接请求
+        const url = QINIU_MODEL_API_URL + '/chat/completions' + (search ? '?search' : '');
+
         // 发送请求
+        console.log('发送了请求', url);
         const response = await axios.post(
-            QINIU_MODEL_API_URL + '/chat/completions',
+            url,
             postData,
             axiosConfig
         );

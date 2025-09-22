@@ -20,6 +20,11 @@
         :class="['stream-btn', isStream ? 'selected' : '']"
         style="margin-left:10px;"
       >{{isStream ? '流式输出' : '普通输出'}}</button>
+      <button
+        @click="toggleSearch"
+        :class="['stream-btn', isSearch ? 'selected' : '']"
+        style="margin-left:10px;"
+      >{{isSearch ? '√联网搜索' : '×联网搜索'}}</button>
     </div>
     <div>
       <label>返回内容：</label>
@@ -30,6 +35,7 @@
 
 <script>
 import axios from 'axios';
+
 export default {
   name: 'ApiTestView',
   data() {
@@ -38,6 +44,7 @@ export default {
       chatText: '你是谁',
       chatResult: '',
       isStream: true,
+      isSearch: false,
     };
   },
   methods: {
@@ -67,71 +74,80 @@ export default {
       }
     },
     async testQiniuChat() {
-      try {
-        this.chatResult = ''; // 清空之前回答的结果
-        
-        // isStream为true，进行流式输出
-        if (this.isStream) {
-          // 流式请求
-          const response = await fetch('http://localhost:3000/api/qiniu/chat-stream', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ chatText: this.chatText })
-          });
+      this.chatResult = ''; // 清空之前回答的结果
+      
+      // isStream为true，进行流式输出
+      if (this.isStream) {
+        // 流式请求
+        const response = await fetch('http://localhost:3000/api/qiniu/chat-stream', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ chatText: this.chatText, search: this.isSearch })
+        });
 
-          // 处理是否为流式响应
-          if (!response.body) {
-            console.error('无流式响应');
-            return;
-          }
+        // 处理是否为流式响应
+        if (!response.body) {
+          console.error('无流式响应');
+          return;
+        }
 
-          // 处理流式响应
-          const reader = response.body.getReader(); // 获取流式读取器
-          const decoder = new TextDecoder(); // 文本解码器
+        // 处理流式响应
+        const reader = response.body.getReader(); // 获取流式读取器
+        const decoder = new TextDecoder(); // 文本解码器
+        let done = true; // 标记读取是否完成
 
-          // 读取流式数据
-          while(true) {
-            const { value } = await reader.read(); // 读取数据块
+        // 读取流式数据
+        while(done) {
+          const { value } = await reader.read(); // 读取数据块
 
-            // value是Uint8Array类型，需要解码为字符串
-            if (value) {
-              const decode = decoder.decode(value).slice(5); // 去掉前缀的"data:"
+          // value是Uint8Array类型，需要解码为字符串
+          if (value) {
+            const decode = decoder.decode(value); // 解码字符串
+            const blocks = decode.split('data:').map(block => block.trim()).filter(block => block); // 按"data:"分割成块
+          
+            for (let block of blocks) {
+              if (block) {
+                // 流式数据以"[DONE]"结尾，表示结束
+                if (block === '[DONE]') {
+                  done = false;
+                  break;
+                }
 
-              // 流式数据以"[DONE]"结尾，表示结束
-              if (decode.trim() === '[DONE]') {
-                break;
-              }
-
-              // 流式数据是JSON格式，需要解析
-              try {
-                const obj = JSON.parse(decode); // 解析JSON
-                this.chatResult = this.chatResult.concat(obj.choices[0].delta.content || ''); // 累加回答内容
-              } catch (err) {
-                // 非完整JSON块时忽略
-                console.error('非完整JSON块:', decode);                
+                // 流式数据是JSON格式，需要解析
+                try {
+                  const obj = JSON.parse(block); // 解析JSON
+                  this.chatResult = this.chatResult.concat(obj.choices[0].delta.content || ''); // 累加回答内容
+                } catch (err) {
+                  // 非完整JSON块时报错
+                  console.error('非完整JSON块:', block);
+                  done = false;  
+                  break;           
+                }
               }
             }
           }
-        } else {
-          // 普通请求 
-          try {
-            const res = await axios.post('http://localhost:3000/api/qiniu/chat', {
-              chatText: this.chatText,
-            });
-            console.log(res.data);
-            this.chatResult = res.data.choices?.[0]?.message?.content || '';
-          } catch (e) {
-            console.error(e.response?.data?.error || e.message);
-          }
         }
-      } catch (e) {
-        console.error(e.message);
+      } else {
+        // 普通请求 
+        try {
+          const res = await axios.post('http://localhost:3000/api/qiniu/chat', {
+            chatText: this.chatText,
+            search: this.isSearch,
+          });
+          console.log(res.data);
+          this.chatResult = res.data.choices?.[0]?.message?.content || '';
+        } catch (e) {
+          console.error('普通请求失败', e.response?.data?.error || e.message);
+        }
       }
     },
     toggleStream() {
       this.isStream = !this.isStream;
+    },
+    toggleSearch() {
+      this.isSearch = !this.isSearch;
     },
   }
 };
