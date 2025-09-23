@@ -13,10 +13,10 @@ const getModel = async (req, res) => {
 //接受请求：模型推理请求
 const chatModel = async (req, res) => {
     try {
-        const { chatText, search } = req.body;
-        const param = { chatText, search };
+        const { messages, search } = req.body;
+        const param = { messages, search };
 
-        if (!chatText) {
+        if (!messages || !Array.isArray(messages) || messages.length === 0) {
             return res.status(400).json({ error: '请求参数缺失' });
         }
 
@@ -30,10 +30,10 @@ const chatModel = async (req, res) => {
 // 接受请求：流式模型推理
 const chatStreamModel = async (req, res) => {
     try {
-        const { chatText, search } = req.body;
-        param = { chatText, stream: true, search, res };
+        const { messages, search } = req.body;
+        param = { messages, stream: true, search, res };
 
-        if (!chatText) {
+        if (!messages || !Array.isArray(messages) || messages.length === 0) {
             return res.status(400).json({ error: '请求参数缺失' });
         }
 

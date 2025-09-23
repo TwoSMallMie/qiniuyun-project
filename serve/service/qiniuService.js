@@ -20,8 +20,8 @@ async function getModel() {
 }
 
 // 模型推理
-// 参数为对象形式: { chatText, stream, search, res }
-async function chatModel({ chatText, stream = false, search = false, res = null }) {
+// 参数为对象形式: { messages, stream, search, res }
+async function chatModel({ messages, stream = false, search = false, res = null }) {
     try {
         // 流式请求必须提供res参数
         if (stream && !res) {
@@ -30,7 +30,7 @@ async function chatModel({ chatText, stream = false, search = false, res = null 
 
         // 构造请求体
         const postData = {
-            "messages": [{"role": "user", "content": chatText}],
+            "messages": messages,
             "model": "deepseek/deepseek-v3.1-terminus" + (search ? "?search" : ""),
         };
         if (stream) postData.stream = true;
