@@ -20,7 +20,8 @@
     {
         "files": ["*.js", "*.vue"],
         "rules": {
-            "no-constant-condition": "off"
+            "no-constant-condition": "off",
+            "no-inner-declarations": "off"
         }
     }
   ]

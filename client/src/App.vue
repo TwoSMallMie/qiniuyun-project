@@ -1,11 +1,21 @@
 <template>
   <div id="app">
-    <nav>
+    <!-- <nav>
       <router-link to="/">test</router-link>
-    </nav>
+      <router-link to="/chat">chat</router-link>
+    </nav> -->
     <router-view/>
   </div>
 </template>
+
+<script>
+export default {
+  name: 'app',
+  mounted() {
+    this.$router.push('/chat');
+  },
+}
+</script>
 
 <style>
 #app {
@@ -26,5 +36,10 @@ nav a {
 
 nav a.router-link-exact-active {
   color: #42b983;
+}
+
+body {
+  padding: 0;
+  margin: 0;
 }
 </style>

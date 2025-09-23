@@ -10,6 +10,11 @@ const routes = [
     component: () => import('../views/ApiTestView.vue')
   },
   // 其他路由...
+  {
+    path: '/chat',
+    name: 'chatView',
+    component: () => import('../views/chatView/index.vue')
+  },
 ]
 
 const router = new VueRouter({
