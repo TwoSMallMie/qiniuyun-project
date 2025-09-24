@@ -1,7 +1,14 @@
 <template>
   <div ref="content" class="content">
     <!-- 聊天框 -->
-    <ChatDialog ref="ChatDialog" :messages="chatResult" @textToSpeech="onTextToSpeech_do"></ChatDialog>
+    <ChatDialog
+      ref="ChatDialog"
+      :messages="chatResult"
+      @textToSpeech="onTextToSpeech_do"
+      @pauseSpeech="onPauseSpeech_pause"
+      @replaySpeech="onReplaySpeech_repaly"
+    >
+    </ChatDialog>
 
     <!-- 快速下拉浮标 -->
     <div ref="scroller" v-show="scroller_visible" class="scroll-to-bottom" @click="onClick_toBottom">
@@ -67,7 +74,7 @@ export default {
     ...mapState({
       chatText: state => state.chatView.chatText, // 用户输入的聊天文本内容
       chatResult: state => state.chatView.chatResult, // 聊天结果
-      audioList: state => state.chatView.voiceList, // 音频列表
+      audioMap: state => state.chatView.audioMap, // 音频列表
     }),
 
     /**
@@ -85,9 +92,9 @@ export default {
       chatResult_setByIndex: 'chatView/chatResult_setByIndex',
       chatResult_push: 'chatView/chatResult_push',
       chatResult_splice: 'chatView/chatResult_splice',
-      audioList_setByIndex: 'chatView/voiceList_setByIndex',
-      audioList_splice: 'chatView/voiceList_splice',
-      audioList_push: 'chatView/voiceList_push',
+      audioMap_setByIndex: 'chatView/audioMap_setByIndex',
+      audioMap_deleteByIndex: 'chatView/audioMap_deleteByIndex',
+      audioMap_getByIndex: 'chatView/audioMap_getByIndex',
     }),
     /***************************************************************
      * 外部调用函数集合 func
@@ -110,48 +117,7 @@ export default {
     /***************************************************************
      * 数据函数集合 _data_
      ***************************************************************/
-    /**
-     * 释放音频资源
-     */
-    releaseAudio() {
-      if (this.audio) {
-        this.audio.pause();
-        this.audio = null;
-        // 播放结束，将svgDividerType_1 改为play
-        if (this.$refs['ChatDialog']) this.$refs['ChatDialog'].svgDividerType_1 = 'play';
-      }
-    },
 
-    /**
-     * 添加audio事件
-     */
-    addEventToAudio() {
-      // 挂载添加错误处理事件
-      this.audio.onerror = (e) => {
-        console.error('音频播放错误:', e);
-
-        // 播放错误，释放音频资源
-        this.releaseAudio();
-      };
-      
-      // 挂载添加播放结束后，释放URL对象事件
-      this.audio.onended = () => {
-        // 播放错误，释放音频资源
-        this.releaseAudio();
-      };
-
-      // 挂载添加暂停播放的事件
-      this.audio.onpause = () => {
-        // 暂停播放，将svgDividerType_1 改为play
-        if (this.$refs['ChatDialog']) this.$refs['ChatDialog'].svgDividerType_1 = 'play';
-      };
-
-      // 挂载添加播放事件
-      this.audio.onplay = () => {
-        // 播放中，将svgDividerType_1 改为pause
-        if (this.$refs['ChatDialog']) this.$refs['ChatDialog'].svgDividerType_1 = 'pause';
-      };
-    },
 
 
     /***************************************************************
@@ -188,7 +154,7 @@ export default {
       this.chatResult_push({ role: 'user', content: this.chatText });
       this.isChat = true; // 标记为正在聊天
       this.chatText_set('');
-      this.chatResult_push({ role: 'assistant', content: '', thinking: true }); // 记录助手信息，初始时助手在思考
+      this.chatResult_push({ role: 'assistant', content: '', thinking: true, audio: 'none' }); // 记录助手信息，初始时助手在思考
       const index = this.chatResult.length - 1;
       
       //发送请求
@@ -298,6 +264,12 @@ export default {
       try {
         // 读取文字
         await processStreamData.call(this, response, index, this.update_scroller_visibility);
+
+        // 读取完成,添加audio
+        this.chatResult_setByIndex([index, {
+          ...this.chatResult[index],
+          audio: 'play'
+        }]);
       }
       catch(e) {
         // 读取失败
@@ -405,9 +377,6 @@ export default {
         return audio;
       }
 
-      // 先将svgDividerType_1 改为loading
-      if (this.$refs['ChatDialog']) this.$refs['ChatDialog'].svgDividerType_1 = 'loading';
-
       // 进行请求，并检查responce，responce为null，表示请求失败，不必后续进程
       const response = await requestTextToSpeech(text, 'qiniu_zh_female_tmjxxy');
       
@@ -425,6 +394,51 @@ export default {
 
       return audio;
     },
+    
+    /**
+     * 添加audio事件
+     */
+    addEventToAudio(audio, idx) {
+      // 挂载添加错误处理事件
+      audio.onerror = (e) => {
+        console.error('音频播放错误:', e);
+      };
+      
+      // 挂载添加播放结束后，释放URL对象事件
+      audio.onended = () => {
+        // 删除音频资源
+        this.audioMap_deleteByIndex(idx);
+
+        // // 从头开始重新播放
+        // if (audio) {
+        //   audio.currentTime = 0;
+        // }
+        
+        // 结束播放，将svgDividerType_1 改为play
+        this.chatResult_setByIndex([idx, {
+          ...this.chatResult[idx],
+          audio: 'play'
+        }]);
+      };
+
+      // 挂载添加暂停播放的事件
+      audio.onpause = () => {
+        // 暂停播放，将svgDividerType_1 改为replay
+        this.chatResult_setByIndex([idx, {
+          ...this.chatResult[idx],
+          audio: 'replay'
+        }]);
+      };
+
+      // 挂载添加播放事件
+      audio.onplay = () => {
+        // 播放中，将svgDividerType_1 改为pause
+        this.chatResult_setByIndex([idx, {
+          ...this.chatResult[idx],
+          audio: 'pause'
+        }]);
+      };
+    },
 
 
     /***************************************************************
@@ -436,24 +450,71 @@ export default {
      * @param idx 消息索引
      */
     async onTextToSpeech_do(text, idx) {
-      // 若已存在音频资源，先释放
-      this.releaseAudio();
+      // 转换前,设置为loading
+      this.chatResult_setByIndex([idx, {
+        ...this.chatResult[idx],
+        audio: 'loading'
+      }]);
 
       // 转为文本转语音
-      this.audioList_push(new WeakMap(idx, await this.QiniuTextToSpeech(text)));
+      const audio = await this.QiniuTextToSpeech(text);
 
-      if (!this.audio) {
+      if (!audio) {
         return;
       }
-      
-      // 请求完成,获取音频后,将svgDividerType_1 改为pause
-      if (this.$refs['ChatDialog']) this.$refs['ChatDialog'].svgDividerType_1 = 'pause';
 
       // 挂载事件
-      this.addEventToAudio();
+      this.addEventToAudio(audio, idx);
 
       // 播放音频
-      this.audio.play();
+      audio.play();
+
+      // 转换完成,设置为pause
+      this.chatResult_setByIndex([idx, {
+        ...this.chatResult[idx],
+        audio: 'pause'
+      }]);
+
+      // 存储音频资源
+      this.audioMap_setByIndex([idx, audio]);
+    },
+
+    /**
+     * 暂停播放
+     * @param idx 消息索引
+     */
+    onPauseSpeech_pause(idx) {
+      // 暂停播放 
+      const audio = this.audioMap.get(idx);
+      console.log(audio, idx, );
+      
+      if (audio) {
+        audio.pause();
+      }
+      
+      // 调整状态为replay
+      this.chatResult_setByIndex([idx, {
+        ...this.chatResult[idx],
+        audio: 'replay'
+      }]);
+    },
+
+    /**
+     * 继续播放
+     * @param idx 消息索引
+     */
+    onReplaySpeech_repaly(idx) {
+      // 继续播放
+      const audio = this.audioMap.get(idx);
+      if (audio) {
+        audio.play();
+      }
+      
+      // 调整状态为pause
+      this.chatResult_setByIndex([idx, {
+        ...this.chatResult[idx],
+        audio: 'pause'
+      }]);
     },
 
     /**

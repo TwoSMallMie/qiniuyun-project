@@ -16,7 +16,7 @@ export default {
     /**
      * 音频列表
      */
-    audioList: [],
+    audioMap: new Map(),
   },
   getters: {
   },
@@ -60,31 +60,31 @@ export default {
 
 
     /**
-     * 设置音色列表
+     * 设置音频列表
      * @param state 状态
      * @param {number[]} args 参数
      * @param {number} args[0] 索引
      * @param {object} args[1] 值
      */
-    audioList_setByIndex(state, [index, value]) {
-      state.audioList[index] = Object.assign({}, value);
-      state.audioList.splice(index, 1);
+    audioMap_setByIndex(state, [index, value]) {
+      state.audioMap.set(index, value);
     },
     /**
-     * 添加音色列表
+     * 从音频列表中删除指定索引的元素
      * @param state 状态
-     * @param {object} value 值
+     * @param {number} index 索引
      */
-    audioList_push(state, value) {
-      state.audioList.push(value);
+    audioMap_deleteByIndex(state, index) {
+      state.audioMap.delete(index);
     },
     /**
-     * 截取音色列表
+     * 获取音频列表中指定索引的元素
      * @param state 状态
-     * @param {number[]} args 参数
+     * @param {number} index 索引
+     * @returns {object} 元素
      */
-    audioList_splice(state, args) {
-      state.audioList.splice(...args);
+    audioMap_getByIndex(state, index) {
+      return state.audioMap.get(index);
     },
   },
   actions: {
