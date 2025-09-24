@@ -11,7 +11,7 @@ import { mapState, mapMutations } from 'vuex';
 export default {
 	name: 'chatMain',
 	components: {
-		MultiLineInput: () => import('@/components/MultiLineInput.vue'),
+		MultiLineInput: () => import('@/components/MultiLineInput/index.vue'),
 	},
 	props: {
     init_title: {

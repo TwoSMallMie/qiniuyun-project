@@ -14,6 +14,7 @@
         </div>
         <div v-else class="chat-bubble" v-html="msg.role !== 'user' ? renderContent_assistant(msg.content) : renderContent_user(msg.content)"></div>
         <div class="chat-divider">
+          <!-- audio -->
           <svg 
             v-if="msg.audio === 'play' && msg.role === 'assistant' && !msg.thinking"
             class="chat-divider-svg"
@@ -45,6 +46,27 @@
           >
             <path d="M460.8 128c-6.4-6.4-19.2-6.4-32 0L224 281.6h-192c-19.2 0-32 19.2-32 32V704c0 19.2 12.8 32 32 32h192L428.8 896c6.4 0 12.8 6.4 19.2 6.4 6.4 0 12.8 0 12.8-6.4 12.8-6.4 19.2-19.2 19.2-25.6V153.6c0-6.4-6.4-19.2-19.2-25.6z m-44.8 678.4L256 684.8c-6.4-6.4-12.8-6.4-19.2-6.4H64V345.6h172.8c6.4 0 12.8 0 19.2-6.4l160-121.6v588.8zM857.6 512c0-115.2-57.6-224-153.6-268.8-12.8-6.4-32 0-44.8 12.8-6.4 12.8 0 32 12.8 44.8 70.4 32 115.2 115.2 115.2 211.2 0 96-44.8 172.8-115.2 211.2-12.8 6.4-19.2 25.6-12.8 44.8 6.4 12.8 19.2 19.2 25.6 19.2 6.4 0 12.8 0 12.8-6.4 102.4-44.8 160-153.6 160-268.8z" p-id="7639" fill="#707070"></path><path d="M601.6 364.8c-12.8-6.4-32 0-44.8 12.8s0 32 12.8 44.8c32 12.8 51.2 51.2 51.2 89.6 0 38.4-19.2 76.8-51.2 89.6-12.8 6.4-19.2 25.6-12.8 44.8 6.4 12.8 19.2 19.2 25.6 19.2 6.4 0 12.8 0 12.8-6.4 57.6-25.6 89.6-83.2 89.6-147.2 0-64-32-121.6-83.2-147.2zM812.8 134.4c-12.8-6.4-32 0-44.8 12.8-6.4 12.8 0 32 12.8 44.8 108.8 51.2 179.2 179.2 179.2 320s-70.4 268.8-179.2 320c-12.8 6.4-19.2 25.6-12.8 44.8 6.4 12.8 19.2 19.2 25.6 19.2 6.4 0 12.8 0 12.8-6.4 128-64 211.2-211.2 211.2-377.6 6.4-166.4-76.8-313.6-204.8-377.6z" fill="#707070"></path>
           </svg>
+
+          <!-- copy -->
+          <svg
+            v-if="msg.copy"
+            class="chat-divider-svg"
+            @click="onClick_copy(msg)"
+            viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M704 384v512H192V384h512m32-64h-576a32 32 0 0 0-32 32v576a32 32 0 0 0 32 32h576a32 32 0 0 0 32-32v-576a32 32 0 0 0-32-32z" fill="#707070" p-id="13863"></path><path d="M320 512m32 0l192 0q32 0 32 32l0 0q0 32-32 32l-192 0q-32 0-32-32l0 0q0-32 32-32Z" fill="#707070" p-id="13864"></path><path d="M320 704m32 0l192 0q32 0 32 32l0 0q0 32-32 32l-192 0q-32 0-32-32l0 0q0-32 32-32Z" fill="#707070" p-id="13865"></path><path d="M928 128h-576a32 32 0 0 0-32 32V256h64V192h512v576h-64v64h96a32 32 0 0 0 32-32v-640a32 32 0 0 0-32-32z" fill="#707070"></path>
+          </svg>
+
+          <!-- reThinking -->
+           <svg
+            v-if="msg.reThinking && idx === lastReThinking"
+            class="chat-divider-svg"
+            @click="onClick_reThinking(idx)"
+            viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M192 512c0-176.32 144.992-320 324.8-320 106.304 0 200.608 50.304 259.84 128H672v64h224V160h-64v127.2A389.792 389.792 0 0 0 516.8 128C302.432 128 128 299.52 128 512s174.464 384 388.8 384c183.552 0 337.728-125.76 378.336-295.328l-62.24-14.88C799.136 726.688 670.592 832 516.736 832 336.992 832 192 688.32 192 512z" fill="#707070"></path>
+          </svg>
+
         </div>
       </div>
     </div>
@@ -53,6 +75,7 @@
 
 <script>
 import { marked } from 'marked';
+import copyToClipboard from '@/utils/copyToClipboard/index.js'; //这里引用了copyToClipboard函数
 
 export default {
   name: 'ChatDialog',
@@ -69,6 +92,22 @@ export default {
        * play loading pause replay
        */
       svgDividerType_1: 'play',
+    }
+  },
+  computed: {
+    /**
+     * 最后一条消息是否在思考中
+     */
+    lastReThinking() {
+      // 倒序遍历messages
+      // 找到最后一个assistant,若它reThinking为true,返回它的下标,否则返回-1
+      for (let i = this.messages.length - 1; i >= 0; i--) {
+        // 找到最后一个assistant
+        if (this.messages[i].role === 'assistant') {
+          return this.messages[i].reThinking ? i : -1;
+        }
+      }
+      return -1;
     }
   },
   methods: {
@@ -114,6 +153,24 @@ export default {
       else if (type === 'replay') {
         this.$emit('replaySpeech', idx);
       }
+    },
+    
+    /**
+     * 点击复制
+     * @param msg 要复制的消息
+     */
+    async onClick_copy(msg) {
+      if (msg.copy) {
+        try {
+          await copyToClipboard(msg.content);
+        }
+        catch (error) {
+          console.error('复制失败', error);
+        }
+      }
+    },
+    onClick_reThinking(idx) {
+      this.$emit('reThinking', idx);
     },
 
 
@@ -163,7 +220,6 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  overflow-y: auto;
 }
 .chat-row {
   display: flex;

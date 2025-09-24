@@ -38,8 +38,8 @@
 <script>
 import axios from 'axios';
 
-import MultiLineInput from '@/components/MultiLineInput.vue';
-import ChatDialog from '@/components/ChatDialog.vue';
+import MultiLineInput from '@/components/MultiLineInput/index.vue';
+import ChatDialog from '@/components/ChatDialog/index.vue';
 
 
 export default {

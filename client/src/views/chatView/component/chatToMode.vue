@@ -6,7 +6,8 @@
       :messages="chatResult"
       @textToSpeech="onTextToSpeech_do"
       @pauseSpeech="onPauseSpeech_pause"
-      @replaySpeech="onReplaySpeech_repaly"
+      @replaySpeech="onReplaySpeech_replay"
+      @reThinking="onReThinking_do"
     >
     </ChatDialog>
 
@@ -25,9 +26,10 @@
 <script>
 import { mapState, mapMutations } from 'vuex';
 import { marked } from 'marked';
+import { createChatResult } from '@/views/chatView/chatResult';
 
-import MultiLineInput from '@/components/MultiLineInput.vue'
-import ChatDialog from '@/components/ChatDialog.vue';
+import MultiLineInput from '@/components/MultiLineInput/index.vue'
+import ChatDialog from '@/components/ChatDialog/index.vue';
 
 export default {
 	name: 'chatToMode',
@@ -149,12 +151,17 @@ export default {
 
     /**
      * 开始聊天
+     * @param isReChat 是否属于重新聊天
      */
-    async QiniuChat() {
-      this.chatResult_push({ role: 'user', content: this.chatText });
+    async QiniuChat(isReChat=false) {
+      // 若是重新聊天,不需提交文本框内容
+      if (!isReChat) {
+        this.chatResult_push(createChatResult('user', this.chatText, {copy:true}));
+        this.chatText_set('');
+      }
+      
       this.isChat = true; // 标记为正在聊天
-      this.chatText_set('');
-      this.chatResult_push({ role: 'assistant', content: '', thinking: true, audio: 'none' }); // 记录助手信息，初始时助手在思考
+      this.chatResult_push(createChatResult('assistant', '', {thinking: true})); // 记录助手信息，初始时助手在思考
       const index = this.chatResult.length - 1;
       
       //发送请求
@@ -253,29 +260,31 @@ export default {
       if (!response || !response.body) {
         this.initChatData(); // 重置聊天状态
         this.chatResult_splice([-1]); //删除
-        this.chatResult_push({ role: 'assistant', content: '⚠️ 请求失败或已取消' }); // 添加错误消息
+        this.chatResult_push(createChatResult('assistant', '⚠️ 请求失败或已取消')); // 添加错误消息
         return;
       }
 
       // 请求完成，助手关闭思考，直接删除，在添加一段空文本数据
       this.chatResult_splice([-1]);
-      this.chatResult_push({ role: 'assistant', content: '' });
+      this.chatResult_push(createChatResult('assistant', '')); // 添加空文本数据
 
       try {
         // 读取文字
         await processStreamData.call(this, response, index, this.update_scroller_visibility);
 
-        // 读取完成,添加audio
+        // 读取完成,添加audio,允许copy,和重新加载
         this.chatResult_setByIndex([index, {
           ...this.chatResult[index],
-          audio: 'play'
+          audio: 'play',
+          copy: true,
+          reThinking: true,
         }]);
       }
       catch(e) {
         // 读取失败
         if (e.msg !== '读取被中止') {
           this.chatResult_splice([-1]); //删除
-          this.chatResult_push({ role: 'assistant', content: '⚠️ 生成失败' }); // 添加错误消息
+          this.chatResult_push(createChatResult('assistant', '⚠️ 生成失败')); // 添加错误消息
         }
       }
       
@@ -486,7 +495,6 @@ export default {
     onPauseSpeech_pause(idx) {
       // 暂停播放 
       const audio = this.audioMap.get(idx);
-      console.log(audio, idx, );
       
       if (audio) {
         audio.pause();
@@ -503,7 +511,7 @@ export default {
      * 继续播放
      * @param idx 消息索引
      */
-    onReplaySpeech_repaly(idx) {
+    onReplaySpeech_replay(idx) {
       // 继续播放
       const audio = this.audioMap.get(idx);
       if (audio) {
@@ -515,6 +523,22 @@ export default {
         ...this.chatResult[idx],
         audio: 'pause'
       }]);
+    },
+
+    /**
+     * 重新思考
+     * @param idx 消息索引
+     */
+    onReThinking_do(idx) {
+      // 删除该项及其随后项
+      this.chatResult_splice([idx]);
+
+      // 关闭声音,并清除音频资源
+      this.audioMap.get(idx)?.pause();
+      this.audioMap_deleteByIndex(idx);
+
+      // 进行重新思考
+      this.QiniuChat(true);
     },
 
     /**

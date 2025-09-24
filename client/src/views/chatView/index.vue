@@ -73,7 +73,7 @@ export default {
       /**
        * 是否处于聊天状态
        */
-      chatting: true,
+      chatting: false,
 		}
 	},
 	mounted() {
