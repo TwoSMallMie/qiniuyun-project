@@ -8,10 +8,45 @@
       <div v-else-if="msg.role === 'user'" class="avatar right-avatar">🧑</div>
 
       <!-- 文本框和其他 -->
-      <div v-if="msg.thinking" class="chat-bubble loading-bubble">
-        <span class="loader"></span>
+      <div class="chat-content-wrapper">
+        <div v-if="msg.thinking" class="chat-bubble loading-bubble">
+          <span class="loader"></span>
+        </div>
+        <div v-else class="chat-bubble" v-html="msg.role !== 'user' ? renderContent_assistant(msg.content) : renderContent_user(msg.content)"></div>
+        <div class="chat-divider">
+          <svg 
+            v-if="svgDividerType_1 === 'play' && msg.role === 'assistant' && idx === messages.length-1 && !msg.thinking"
+            class="chat-divider-svg"
+            @click="onClick_textToSpeech(msg, idx, 'play')"
+            viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M460.8 128c-6.4-6.4-19.2-6.4-32 0L224 281.6h-192c-19.2 0-32 19.2-32 32V704c0 19.2 12.8 32 32 32h192L428.8 896c6.4 0 12.8 6.4 19.2 6.4 6.4 0 12.8 0 12.8-6.4 12.8-6.4 19.2-19.2 19.2-25.6V153.6c0-6.4-6.4-19.2-19.2-25.6z m-44.8 678.4L256 684.8c-6.4-6.4-12.8-6.4-19.2-6.4H64V345.6h172.8c6.4 0 12.8 0 19.2-6.4l160-121.6v588.8zM857.6 512c0-115.2-57.6-224-153.6-268.8-12.8-6.4-32 0-44.8 12.8-6.4 12.8 0 32 12.8 44.8 70.4 32 115.2 115.2 115.2 211.2 0 96-44.8 172.8-115.2 211.2-12.8 6.4-19.2 25.6-12.8 44.8 6.4 12.8 19.2 19.2 25.6 19.2 6.4 0 12.8 0 12.8-6.4 102.4-44.8 160-153.6 160-268.8z" p-id="7639" fill="#707070"></path><path d="M601.6 364.8c-12.8-6.4-32 0-44.8 12.8s0 32 12.8 44.8c32 12.8 51.2 51.2 51.2 89.6 0 38.4-19.2 76.8-51.2 89.6-12.8 6.4-19.2 25.6-12.8 44.8 6.4 12.8 19.2 19.2 25.6 19.2 6.4 0 12.8 0 12.8-6.4 57.6-25.6 89.6-83.2 89.6-147.2 0-64-32-121.6-83.2-147.2zM812.8 134.4c-12.8-6.4-32 0-44.8 12.8-6.4 12.8 0 32 12.8 44.8 108.8 51.2 179.2 179.2 179.2 320s-70.4 268.8-179.2 320c-12.8 6.4-19.2 25.6-12.8 44.8 6.4 12.8 19.2 19.2 25.6 19.2 6.4 0 12.8 0 12.8-6.4 128-64 211.2-211.2 211.2-377.6 6.4-166.4-76.8-313.6-204.8-377.6z" fill="#707070"></path>
+          </svg>
+          <svg
+            v-else-if="svgDividerType_1 === 'pause' && msg.role === 'assistant' && !msg.thinking"
+            class="chat-divider-svg"
+            @click="onClick_pauseSpeech(msg, idx, 'pause')"
+            viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M512 62.389956c-248.312412 0-449.610044 201.297632-449.610044 449.610044s201.297632 449.610044 449.610044 449.610044 449.610044-201.297632 449.610044-449.610044S760.312412 62.389956 512 62.389956zM786.507004 786.507004c-35.672454 35.672454-77.196173 63.672158-123.416867 83.222423-47.821145 20.22667-98.655927 30.482245-151.09116 30.482245-52.435233 0-103.270015-10.255575-151.09116-30.482245-46.220694-19.549242-87.744413-47.549969-123.416867-83.222423-35.672454-35.672454-63.672158-77.196173-83.222423-123.416867-20.22667-47.821145-30.482245-98.655927-30.482245-151.090137 0-52.435233 10.255575-103.270015 30.482245-151.09116 19.549242-46.220694 47.549969-87.744413 83.222423-123.416867 35.672454-35.672454 77.196173-63.672158 123.416867-83.222423 47.821145-20.22667 98.654904-30.482245 151.09116-30.482245 52.435233 0 103.268992 10.255575 151.09116 30.482245 46.220694 19.549242 87.744413 47.549969 123.416867 83.222423 35.672454 35.672454 63.672158 77.196173 83.222423 123.416867 20.22667 47.821145 30.482245 98.655927 30.482245 151.09116 0 52.435233-10.255575 103.268992-30.482245 151.090137C850.179163 709.310831 822.179458 750.83455 786.507004 786.507004zM699.168844 285.84933 583.882144 285.84933c-3.203972 0-5.801123 2.597151-5.801123 5.801123l0 440.698071c0 3.203972 2.597151 5.801123 5.801123 5.801123l115.2867 0c3.203972 0 5.801123-2.597151 5.801123-5.801123L704.969966 291.650453C704.97099 288.446481 702.373839 285.84933 699.168844 285.84933zM440.117856 285.84933 324.830133 285.84933c-3.203972 0-5.801123 2.597151-5.801123 5.801123l0 440.698071c0 3.203972 2.597151 5.801123 5.801123 5.801123L440.117856 738.149647c3.203972 0 5.801123-2.597151 5.801123-5.801123L445.918979 291.650453C445.918979 288.446481 443.321828 285.84933 440.117856 285.84933z" fill="#707070"></path>
+          </svg>
+          <svg 
+            v-else-if="svgDividerType_1 === 'loading' && msg.role === 'assistant'&& !msg.thinking"
+            class="chat-divider-svg"
+            viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M753.365333 270.634667a46.08 46.08 0 0 1-61.226666 3.498666 220.970667 220.970667 0 0 0-14.293334-10.581333 298.752 298.752 0 0 0-441.770666 362.666667 298.666667 298.666667 0 0 0 571.904-74.282667A45.696 45.696 0 0 1 853.333333 512h3.328a37.333333 37.333333 0 0 1 37.12 41.301333 384 384 0 1 1-151.936-348.970666c2.56 1.92 5.418667 4.181333 8.618667 6.826666a40.192 40.192 0 0 1 2.901333 59.477334z" fill="#707070"></path>
+          </svg>
+          <svg 
+            v-if="svgDividerType_1 === 'replay' && msg.role === 'assistant' && !msg.thinking"
+            class="chat-divider-svg"
+            @click="onClick_textToSpeech(msg, idx, 'replay')"
+            viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M460.8 128c-6.4-6.4-19.2-6.4-32 0L224 281.6h-192c-19.2 0-32 19.2-32 32V704c0 19.2 12.8 32 32 32h192L428.8 896c6.4 0 12.8 6.4 19.2 6.4 6.4 0 12.8 0 12.8-6.4 12.8-6.4 19.2-19.2 19.2-25.6V153.6c0-6.4-6.4-19.2-19.2-25.6z m-44.8 678.4L256 684.8c-6.4-6.4-12.8-6.4-19.2-6.4H64V345.6h172.8c6.4 0 12.8 0 19.2-6.4l160-121.6v588.8zM857.6 512c0-115.2-57.6-224-153.6-268.8-12.8-6.4-32 0-44.8 12.8-6.4 12.8 0 32 12.8 44.8 70.4 32 115.2 115.2 115.2 211.2 0 96-44.8 172.8-115.2 211.2-12.8 6.4-19.2 25.6-12.8 44.8 6.4 12.8 19.2 19.2 25.6 19.2 6.4 0 12.8 0 12.8-6.4 102.4-44.8 160-153.6 160-268.8z" p-id="7639" fill="#707070"></path><path d="M601.6 364.8c-12.8-6.4-32 0-44.8 12.8s0 32 12.8 44.8c32 12.8 51.2 51.2 51.2 89.6 0 38.4-19.2 76.8-51.2 89.6-12.8 6.4-19.2 25.6-12.8 44.8 6.4 12.8 19.2 19.2 25.6 19.2 6.4 0 12.8 0 12.8-6.4 57.6-25.6 89.6-83.2 89.6-147.2 0-64-32-121.6-83.2-147.2zM812.8 134.4c-12.8-6.4-32 0-44.8 12.8-6.4 12.8 0 32 12.8 44.8 108.8 51.2 179.2 179.2 179.2 320s-70.4 268.8-179.2 320c-12.8 6.4-19.2 25.6-12.8 44.8 6.4 12.8 19.2 19.2 25.6 19.2 6.4 0 12.8 0 12.8-6.4 128-64 211.2-211.2 211.2-377.6 6.4-166.4-76.8-313.6-204.8-377.6z" fill="#707070"></path>
+          </svg>
+        </div>
       </div>
-      <div v-else class="chat-bubble" v-html="msg.role !== 'user' ? renderContent_assistant(msg.content) : renderContent_user(msg.content)"></div>
     </div>
   </div>
 </template>
@@ -27,11 +62,77 @@ export default {
       required: true
     }
   },
+  data() {
+    return {
+      /**
+       * 聊天框底部的svg图标类型_1
+       * play loading pause replay
+       */
+      svgDividerType_1: 'play',
+    }
+  },
   methods: {
+    /***************************************************************
+     * 外部调用函数集合 func
+     ***************************************************************/
+    reset_svgDividerType_1(value) {
+      this.svgDividerType_1 = value;
+    },
+
+    
+    /***************************************************************
+     * 工具函数集合 helper
+     ***************************************************************/
+
+
+     
+    /***************************************************************
+     * 数据函数集合 data
+     ***************************************************************/
+
+
+
+    /***************************************************************
+     * 事件函数集合(部分) onevent_part
+     ***************************************************************/
+
+
+    /***************************************************************
+     * 事件函数集合 onevent
+     ***************************************************************/
+    /**
+     * 点击语音转文本
+     */
+    async onClick_textToSpeech(msg, idx, type) {
+      // this.$emit('textToSpeech', msg.content, idx, type);
+      if (type === 'play') {
+        this.$emit('textToSpeech', msg.content, idx, type);
+      }
+      else if (type === 'pause') {
+        this.$emit('pauseSpeech', idx);
+      }
+      else if (type === 'replay') {
+        this.$emit('replaySpeech', idx);
+      }
+    },
+
+
+    /***************************************************************
+     * 其他函数集合 other
+     ***************************************************************/
+    /**
+     * 将markdown字符串转为html
+     * @param content md字符串
+     */
     renderContent_assistant(content) {
       // 支持 markdown 渲染
       return marked(content || '');
     },
+
+    /**
+     * 将markdown字符串转为html，同时处理特殊字符
+     * @param content md字符串
+     */
     renderContent_user(content) {
       return marked(
         content
@@ -41,8 +142,14 @@ export default {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;")
       )
-    }
+    },
 
+
+
+    on_(...args) {
+      console.log(...args);
+      
+    }
   }
 };
 </script>
@@ -61,6 +168,7 @@ export default {
 .chat-row {
   display: flex;
   align-items: flex-end;
+  gap: 8px;
 }
 .chat-row.assistant {
   flex-direction: row;
@@ -68,11 +176,11 @@ export default {
 }
 .chat-row.user {
   flex-direction: row-reverse;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 .chat-row.error {
   flex-direction: row-reverse;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 .avatar {
   width: 36px;
@@ -83,7 +191,7 @@ export default {
   align-items: center;
   justify-content: center;
   font-size: 22px;
-  margin: 0 8px;
+  transform: translate(0px, -16px);
 }
 .left-avatar {
   background: #e3eafc;
@@ -91,8 +199,18 @@ export default {
 .right-avatar {
   background: #cbe7ff;
 }
+.chat-content-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.chat-row.user .chat-content-wrapper,
+.chat-row.error .chat-content-wrapper {
+  align-items: flex-end;
+}
 .chat-bubble {
-  max-width: 80%;
+  max-width: calc(80% - 18px);
   padding: 0px 12px;
   border-radius: 12px;
   font-size: 12px;
@@ -106,11 +224,6 @@ export default {
   background: #2563eb;
   color: #fff;
   margin-left: auto;
-}
-.chat-row.user .avatar,
-.chat-row.error .avatar {
-  margin-left: 8px;
-  margin-right: 0;
 }
 .error-msg {
   color: #d32f2f;
@@ -139,6 +252,16 @@ export default {
   border-radius: 50%;
   animation: spin 1s linear infinite;
   display: inline-block;
+}
+.chat-divider {
+  height: 18px;
+  margin: 8px 12px 0px 12px;
+}
+.chat-divider-svg {
+  width: 18px;
+  height: 18px;
+  margin: 0 8px;
+  cursor: pointer;
 }
 /* 隐藏所有滚动条（适用于现代浏览器） */
 .hide_scrolling {

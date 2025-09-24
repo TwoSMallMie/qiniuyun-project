@@ -1,19 +1,23 @@
 <template>
   <div ref="content" class="content">
-    <ChatDialog ref="ChatDialog" :messages="chatResult"></ChatDialog>
+    <!-- 聊天框 -->
+    <ChatDialog ref="ChatDialog" :messages="chatResult" @textToSpeech="onTextToSpeech_do"></ChatDialog>
 
+    <!-- 快速下拉浮标 -->
     <div ref="scroller" v-show="scroller_visible" class="scroll-to-bottom" @click="onClick_toBottom">
       <svg width="32" height="32" viewBox="0 0 33 33" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M10 13 L17 21 L23 13" stroke="#666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
 
-    <MultiLineInput ref="multiLineInput" :value="chatText" :submitType="submitType" @input="onInput" @submit="onSubmitChat"></MultiLineInput>
+    <!-- 文本输入框 --> 
+    <MultiLineInput ref="multiLineInput" :value="chatText" :submitType="submitType" @input="onInput_setText" @submit="onSubmit_toChat"></MultiLineInput>
   </div>
 </template>
 
 <script>
 import { mapState, mapMutations } from 'vuex';
+import { marked } from 'marked';
 
 import MultiLineInput from '@/components/MultiLineInput.vue'
 import ChatDialog from '@/components/ChatDialog.vue';
@@ -28,18 +32,47 @@ export default {
 	},
 	data() {
     return {
+      /**
+       * 聊天读取器
+       */
       chatReader: null,
+
+      /**
+       * 请求取消控制器
+       */
       chatAbortController: null,
+
+      /**
+       * 是否在聊天
+       */
       isChat: false,
+
+      /**
+       * 是否联网搜索
+       */
       isSearch: true,
+
+      /**
+       * 快速下拉浮标是否可见
+       */
       scroller_visible: false,
+
+      /**
+       * 滚动事件监听器
+       */
+      scrollListener: null,
     }
   },
   computed: {
     ...mapState({
-      chatText: state => state.chatView.chatText,
-      chatResult: state => state.chatView.chatResult,
+      chatText: state => state.chatView.chatText, // 用户输入的聊天文本内容
+      chatResult: state => state.chatView.chatResult, // 聊天结果
+      audioList: state => state.chatView.voiceList, // 音频列表
     }),
+
+    /**
+     * 提交按钮类型
+     */
     submitType() {
       return this.isChat ? 'pause' : 'submit';
     },
@@ -51,90 +84,106 @@ export default {
       chatText_set: 'chatView/chatText_set',
       chatResult_setByIndex: 'chatView/chatResult_setByIndex',
       chatResult_push: 'chatView/chatResult_push',
-      chatResult_splice: 'chatView/chatResult_splice'
+      chatResult_splice: 'chatView/chatResult_splice',
+      audioList_setByIndex: 'chatView/voiceList_setByIndex',
+      audioList_splice: 'chatView/voiceList_splice',
+      audioList_push: 'chatView/voiceList_push',
     }),
-
-    //func
-    
+    /***************************************************************
+     * 外部调用函数集合 func
+     ***************************************************************/
     submit(e) {
-      this.onSubmitChat(e);
+      this.onSubmit_toChat(e);
       this.$nextTick(() => {
         this.reset_scroller();
-        this.judge_scroller_visible();
+        this.update_scroller_visibility();
       })
     },
-    reset_scroller() {
-      // 获取容器高和宽
-      const content_height = this.$refs['content'].clientHeight;
-      const content_width = this.$refs['content'].clientWidth;
 
-      // 获取表单高
-      const MultiLineInput_height = this.$refs['multiLineInput'].$el.clientHeight;
+    
+    /***************************************************************
+     * 工具函数集合 helper
+     ***************************************************************/
 
-      // 获取游标宽高
-      const scroller_height = this.$refs['scroller'].clientHeight;
-      const scroller_width = this.$refs['scroller'].clientWidth;
 
-      // 填写边距数值
-      const height = 8;
-      // const width = 0;
-
-      // 计算游标位置      
-      console.log(content_height - scroller_height - MultiLineInput_height);
-      
-      this.$refs['scroller'].style.left = `${(content_width - scroller_width) / 2}px`;
-      this.$refs['scroller'].style.bottom = `${MultiLineInput_height + height}px`;
+     
+    /***************************************************************
+     * 数据函数集合 _data_
+     ***************************************************************/
+    /**
+     * 释放音频资源
+     */
+    releaseAudio() {
+      if (this.audio) {
+        this.audio.pause();
+        this.audio = null;
+        // 播放结束，将svgDividerType_1 改为play
+        if (this.$refs['ChatDialog']) this.$refs['ChatDialog'].svgDividerType_1 = 'play';
+      }
     },
-    judge_scroller_visible() {
+
+    /**
+     * 添加audio事件
+     */
+    addEventToAudio() {
+      // 挂载添加错误处理事件
+      this.audio.onerror = (e) => {
+        console.error('音频播放错误:', e);
+
+        // 播放错误，释放音频资源
+        this.releaseAudio();
+      };
+      
+      // 挂载添加播放结束后，释放URL对象事件
+      this.audio.onended = () => {
+        // 播放错误，释放音频资源
+        this.releaseAudio();
+      };
+
+      // 挂载添加暂停播放的事件
+      this.audio.onpause = () => {
+        // 暂停播放，将svgDividerType_1 改为play
+        if (this.$refs['ChatDialog']) this.$refs['ChatDialog'].svgDividerType_1 = 'play';
+      };
+
+      // 挂载添加播放事件
+      this.audio.onplay = () => {
+        // 播放中，将svgDividerType_1 改为pause
+        if (this.$refs['ChatDialog']) this.$refs['ChatDialog'].svgDividerType_1 = 'pause';
+      };
+    },
+
+
+    /***************************************************************
+     * 事件函数集合(部分) onevent_part
+     ***************************************************************/
+    /**
+     * 滚动至聊天框底部
+     */
+    ChatDialogToBottom() {
+      //获取容器
       const ChatDialog = this.$refs['ChatDialog'];
       
-      if (ChatDialog) {
-        const ChatDialog_el = ChatDialog.$el;
+      if (!ChatDialog) {
+        return;
+      }
 
-        if (ChatDialog_el.scrollHeight <= ChatDialog_el.clientHeight) {
-          this.scroller_visible =  false;
-        }
-        else {
-          this.scroller_visible =  true;
-        }
-      }
-      else {
-        this.scroller_visible =  false;
-      }
+      //滚动至底部
+      ChatDialog.$el.scrollTo({ top: ChatDialog.$el.scrollHeight, behavior: "smooth" });
     },
 
-
-
-    //on
-    onInput(e) {
-      this.chatText_set(e);
-    },
-    onSubmitChat() {
-      // 如果正在聊天，则停止请求
-      if (this.isChat) {
-        // 若已建立了读取器，取消流式读取
-        if (this.chatReader) {
-          this.chatReader.cancel();
-        }
-
-        // 取消请求
-        if (this.chatAbortController) {
-          this.chatAbortController.abort();
-        }
-
-        // 重置聊天状态
-        this.initChatData();
-      }
-      // 未在聊天在则开始聊天
-      else {
-        this.QiniuChat();
-      }
-    },
+    /**
+     * 初始化一些聊天相关数据
+     */
     initChatData() {
       this.isChat = false; // 标记为未在聊天
       this.chatReader = null; // 清除读取器
       this.chatAbortController = null; // 清除取消控制器
     },
+
+    /**
+     * 开始聊天
+     */
     async QiniuChat() {
       this.chatResult_push({ role: 'user', content: this.chatText });
       this.isChat = true; // 标记为正在聊天
@@ -187,7 +236,7 @@ export default {
           // 读取过程中若isChat变为false，停止读取
           if (!this.isChat) {
             done = false;
-            return {message: '读取被中止'};
+            throw new Error('读取被中止', {msg: '读取被中止', status: true});
           }
 
           // 读取数据
@@ -203,7 +252,7 @@ export default {
             for (let block of blocks) {
               if (block === '[DONE]') {
                 done = false;
-                return {message: '读取完成'};
+                return {msg: '读取完成', status: true};
               }   
 
               try {
@@ -213,7 +262,7 @@ export default {
               catch (err) {
                 console.error('非完整JSON块:', block);
                 done = false;
-                return {message: '读取异常'};
+                throw new Error('读取异常', {msg: '读取异常', status: false});
               }
 
               // 拼接回答内容, 实时更新回答内容
@@ -231,9 +280,8 @@ export default {
           }
         }
       }
-
       
-      const response = await toRequest.call(this); //获取请求的response
+      let response = await toRequest.call(this); //获取请求的response
 
       // 若无响应或响应无body，视为请求失败
       if (!response || !response.body) {
@@ -247,17 +295,291 @@ export default {
       this.chatResult_splice([-1]);
       this.chatResult_push({ role: 'assistant', content: '' });
 
-      await processStreamData.call(this, response, index, this.judge_scroller_visible);
-
+      try {
+        // 读取文字
+        await processStreamData.call(this, response, index, this.update_scroller_visibility);
+      }
+      catch(e) {
+        // 读取失败
+        if (e.msg !== '读取被中止') {
+          this.chatResult_splice([-1]); //删除
+          this.chatResult_push({ role: 'assistant', content: '⚠️ 生成失败' }); // 添加错误消息
+        }
+      }
+      
       // 聊天结束，重置状态
       this.initChatData();
     },
-    onClick_toBottom() {
-      //获取容器
-      const ChatDialog = this.$refs['ChatDialog'].$el;
 
-      //滚动至底部
-      ChatDialog.scrollTo({ top: ChatDialog.scrollHeight, behavior: "smooth" })
+    /**
+     * 文本转语音
+     * @param text 要转换的文本
+     * @returns {Audio | null} 音频对象 null表示转换失败
+     */
+    async QiniuTextToSpeech(text) {
+      /**
+       * 文本转语音
+       * @param text 文本内容
+       * @param voiceType 音色类型
+       * @returns {object | null} 响应数据 null表示请求失败
+       */
+      async function requestTextToSpeech(text, voiceType) {
+        // 文本可能时md格式，需要转换为纯文本形式
+        text = marked(text); // 转换为html
+        text = text.replace(/<[^>]+>/g, ''); // 移除html标签
+
+        // 检查文本是否为空
+        if (!text) {
+          console.error('未收到文本数据');
+          return null;
+        }
+
+        // 配置请求体
+        const requestBody = {
+          text: text,
+          voiceType: voiceType,
+        };       
+
+        let response; // 响应对象
+
+        // 发送请求
+        try {
+          response = await fetch('http://localhost:3000/api/qiniu/tts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+          });
+
+          // 检查响应状态
+          if (!response.ok && response) {
+            throw new Error('网络响应失败', {msg: '网络响应失败', status: false});
+          }
+        }
+        catch(e) {
+          console.error('请求失败:', e);
+          return null;
+        }
+
+        return response.json();
+      }
+      
+      /**
+       * 将base64编码转为MP3
+       * @param base64Code base64编码
+       * @returns {Audio | null} 音频对象 null表示转换失败
+       */
+      function base64ToMP3(base64Code) {
+        let audio = null;
+
+        // 检查base64数据是否存在
+        if (!base64Code) {
+          console.error('未收到音频数据');
+          return null;
+        }
+
+        // 将base64编码转换为MP3
+        try {
+          // 移除可能的data URL前缀,解码base64数据
+          const cleanBase64Code = base64Code.replace(/^data:audio\/mp3;base64,/, '');
+          const binaryString = atob(cleanBase64Code);
+          
+          // 转换为Uint8Array
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          
+          // 创建Blob对象
+          const mp3Blob = new Blob([bytes], { type: 'audio/mp3' });
+          const mp3Url = URL.createObjectURL(mp3Blob);
+          
+          // 转为音频
+          audio = new Audio(mp3Url);
+        } catch (error) {
+          console.error('音频数据处理失败:', error);
+          return null;
+        }
+
+        return audio;
+      }
+
+      // 先将svgDividerType_1 改为loading
+      if (this.$refs['ChatDialog']) this.$refs['ChatDialog'].svgDividerType_1 = 'loading';
+
+      // 进行请求，并检查responce，responce为null，表示请求失败，不必后续进程
+      const response = await requestTextToSpeech(text, 'qiniu_zh_female_tmjxxy');
+      
+      if (!response) {
+        return null;
+      }
+
+      // 获取base64编码,并将base64编码转为MP3
+      const base64Code = response.data;
+      const audio = base64ToMP3(base64Code);
+
+      if (!audio) {
+        return null;
+      }
+
+      return audio;
+    },
+
+
+    /***************************************************************
+     * 事件函数集合 onevent
+     ***************************************************************/
+    /**
+     * 文本转语音
+     * @param text 文本内容
+     * @param idx 消息索引
+     */
+    async onTextToSpeech_do(text, idx) {
+      // 若已存在音频资源，先释放
+      this.releaseAudio();
+
+      // 转为文本转语音
+      this.audioList_push(new WeakMap(idx, await this.QiniuTextToSpeech(text)));
+
+      if (!this.audio) {
+        return;
+      }
+      
+      // 请求完成,获取音频后,将svgDividerType_1 改为pause
+      if (this.$refs['ChatDialog']) this.$refs['ChatDialog'].svgDividerType_1 = 'pause';
+
+      // 挂载事件
+      this.addEventToAudio();
+
+      // 播放音频
+      this.audio.play();
+    },
+
+    /**
+     * 点击滚动至聊天框底部
+     */
+    onClick_toBottom() {
+      this.ChatDialogToBottom();
+    },
+
+    /**
+     * 修改聊天文本内容
+     * @param e 文本内容
+     */
+    onInput_setText(e) {
+      this.chatText_set(e);
+    },
+
+    /**
+     * 进行聊天或结束聊天
+     */
+    onSubmit_toChat() {
+      // 如果正在聊天，则停止请求
+      if (this.isChat) {
+        // 若已建立了读取器，取消流式读取
+        if (this.chatReader) {
+          this.chatReader.cancel();
+        }
+
+        // 取消请求
+        if (this.chatAbortController) {
+          this.chatAbortController.abort();
+        }
+
+        // 重置聊天状态
+        this.initChatData();
+      }
+      // 未在聊天在则开始聊天
+      else {
+        this.QiniuChat();
+      }
+    },
+    
+
+    /***************************************************************
+     * 其他函数集合 other
+     ***************************************************************/
+    /**
+     * 计算游标位置
+     */
+    reset_scroller() {
+      try {
+        // 获取容器宽
+        // 获取表单高
+        // 获取游标宽高
+        // 填写边距数值
+        const content_width = this.$refs['content'].clientWidth;
+        const MultiLineInput_height = this.$refs['multiLineInput'].$el.clientHeight;
+        const scroller_width = this.$refs['scroller'].clientWidth;
+        const height = 8;
+        // const width = 0;
+
+        // 计算游标位置            
+        this.$refs['scroller'].style.left = `${(content_width - scroller_width) / 2}px`;
+        this.$refs['scroller'].style.bottom = `${MultiLineInput_height + height}px`;
+      }
+      catch(e) {
+        console.error(e);
+        return;
+      }
+    },
+
+    /**
+     * 判断快速下拉浮标是否可见
+     * 当聊天内容高度超过容器高度时显示浮标
+     */
+    update_scroller_visibility() {
+      const ChatDialog = this.$refs['ChatDialog'];
+
+      // 若聊天框不存在，隐藏浮标
+      if (!ChatDialog) {
+        this.scroller_visible = false;
+        return;
+      }
+
+      // 当聊天内容高度超过容器高度时显示浮标
+      const shouldShow = ChatDialog.$el.scrollHeight > ChatDialog.$el.clientHeight;
+      this.scroller_visible = shouldShow;
+
+      // 当滚动到最底部时，隐藏浮标
+      if (ChatDialog.$el.scrollTop + ChatDialog.$el.clientHeight >= ChatDialog.$el.scrollHeight - 1) {
+        this.scroller_visible = false;
+      }
+    },
+
+    /**
+     * 初始化滚动事件监听
+     */
+    init_scroll_listener() {
+      const ChatDialog = this.$refs['ChatDialog'];
+      if (!ChatDialog) return;
+
+      // 移除旧的监听器
+      if (this.scrollListener) {
+        ChatDialog.$el.removeEventListener('scroll', this.scrollListener);
+      }
+
+      // 创建新的监听器
+      this.scrollListener = () => {
+        this.update_scroller_visibility();
+      };
+
+      // 添加滚动事件监听
+      ChatDialog.$el.addEventListener('scroll', this.scrollListener);
+    },
+
+    /**
+     * 清理滚动事件监听
+     */
+    cleanup_scroll_listener() {
+      if (this.scrollListener) {
+        const ChatDialog = this.$refs['ChatDialog'];
+        if (ChatDialog) {
+          ChatDialog.$el.removeEventListener('scroll', this.scrollListener);
+        }
+        this.scrollListener = null;
+      }
     },
 
     on_(...args) {
@@ -266,6 +588,11 @@ export default {
   },
   mounted() {
     this.reset_scroller();
+    this.update_scroller_visibility();
+    this.init_scroll_listener();
+  },
+  beforeDestroy() {
+    this.cleanup_scroll_listener();
   },
 }
 </script>

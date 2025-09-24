@@ -41,13 +41,18 @@ app.get('/api/users', userController.getUsers);
 // 获取七牛云可用的模型
 app.get('/api/qiniu/model', qiniuController.getModel);
 
-
 // 进行七牛云模型推理api
 app.post('/api/qiniu/chat', qiniuController.chatModel);
 
 // 七牛云模型推理API - 流式输出
 app.post('/api/qiniu/chat-stream', qiniuController.chatStreamModel);
 
+
+// 获取七牛云音色列表
+app.get('/api/qiniu/voice', qiniuController.getVoice);
+
+// 文本转语音
+app.post('/api/qiniu/tts', qiniuController.tts);
 
 
 // node serve 启动
