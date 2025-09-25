@@ -26,7 +26,10 @@
 <script>
 import { mapState, mapMutations } from 'vuex';
 import { marked } from 'marked';
+
+import request from '@/utils/request';
 import { createChatResult } from '@/views/chatView/chatResult';
+import { throttle } from '@/utils/helper';
 
 import MultiLineInput from '@/components/MultiLineInput/index.vue'
 import ChatDialog from '@/components/ChatDialog/index.vue';
@@ -70,6 +73,11 @@ export default {
        * 滚动事件监听器
        */
       scrollListener: null,
+
+      /**
+       * DOM内容变化监听器
+       */
+      contentObserver: null,
     }
   },
   computed: {
@@ -164,7 +172,10 @@ export default {
       this.chatResult_push(createChatResult('assistant', '', {thinking: true})); // 记录助手信息，初始时助手在思考
       const index = this.chatResult.length - 1;
       
-      //发送请求
+      /**
+       * 发送请求
+       * @returns {Promise<Response>} 响应对象
+       */
       async function toRequest() {
         this.chatAbortController = new AbortController(); // 创建取消控制器
         let response; // 保存响应对象
@@ -197,8 +208,12 @@ export default {
         return response;
       }
 
-      //开始处理流式响应
-      async function processStreamData(response, index, done_callback=null) {
+      /**
+       * 处理流式响应数据
+       * @param response 响应对象
+       * @param index 聊天结果索引
+       */
+      async function processStreamData(response, index) {
         const reader = response.body.getReader(); // 获取流式读取器
         this.chatReader = reader; // 保存读取器以便后续可能的取消
         const decoder = new TextDecoder(); // 文本解码器
@@ -246,11 +261,6 @@ export default {
               }]);
             }
           }
-
-          // 每次处理一个块结束后的回调
-          if (done_callback) {
-            done_callback();
-          }
         }
       }
       
@@ -260,17 +270,17 @@ export default {
       if (!response || !response.body) {
         this.initChatData(); // 重置聊天状态
         this.chatResult_splice([-1]); //删除
-        this.chatResult_push(createChatResult('assistant', '⚠️ 请求失败或已取消')); // 添加错误消息
+        this.chatResult_push(createChatResult('assistant', '⚠️ 请求失败或已取消', {reThinking: true})); // 添加错误消息
         return;
       }
 
       // 请求完成，助手关闭思考，直接删除，在添加一段空文本数据
       this.chatResult_splice([-1]);
-      this.chatResult_push(createChatResult('assistant', '')); // 添加空文本数据
+      this.chatResult_push(createChatResult('assistant', '', {reThinking: true})); // 添加空文本数据
 
       try {
         // 读取文字
-        await processStreamData.call(this, response, index, this.update_scroller_visibility);
+        await processStreamData.call(this, response, index);
 
         // 读取完成,添加audio,允许copy,和重新加载
         this.chatResult_setByIndex([index, {
@@ -325,25 +335,18 @@ export default {
 
         // 发送请求
         try {
-          response = await fetch('http://localhost:3000/api/qiniu/tts', {
+          response = await request({
+            url: '/api/qiniu/tts',
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody),
+            data: requestBody,
           });
-
-          // 检查响应状态
-          if (!response.ok && response) {
-            throw new Error('网络响应失败', {msg: '网络响应失败', status: false});
-          }
         }
         catch(e) {
           console.error('请求失败:', e);
           return null;
         }
 
-        return response.json();
+        return response;
       }
       
       /**
@@ -469,6 +472,11 @@ export default {
       const audio = await this.QiniuTextToSpeech(text);
 
       if (!audio) {
+        // 转换失败,设置为play
+        this.chatResult_setByIndex([idx, {
+          ...this.chatResult[idx],
+          audio: 'play'
+        }]);
         return;
       }
 
@@ -617,19 +625,14 @@ export default {
     update_scroller_visibility() {
       const ChatDialog = this.$refs['ChatDialog'];
 
-      // 若聊天框不存在，隐藏浮标
-      if (!ChatDialog) {
+      // 若聊天框不存在，或滚动到最底部时，隐藏浮标
+      if (!ChatDialog || 
+          ChatDialog.$el.scrollTop + ChatDialog.$el.clientHeight >= ChatDialog.$el.scrollHeight - 1) {
         this.scroller_visible = false;
-        return;
       }
-
       // 当聊天内容高度超过容器高度时显示浮标
-      const shouldShow = ChatDialog.$el.scrollHeight > ChatDialog.$el.clientHeight;
-      this.scroller_visible = shouldShow;
-
-      // 当滚动到最底部时，隐藏浮标
-      if (ChatDialog.$el.scrollTop + ChatDialog.$el.clientHeight >= ChatDialog.$el.scrollHeight - 1) {
-        this.scroller_visible = false;
+      else if (ChatDialog.$el.scrollHeight > ChatDialog.$el.clientHeight) {
+        this.scroller_visible = true;
       }
     },
 
@@ -646,9 +649,9 @@ export default {
       }
 
       // 创建新的监听器
-      this.scrollListener = () => {
+      this.scrollListener = throttle(function() {
         this.update_scroller_visibility();
-      };
+      }.bind(this), 128);
 
       // 添加滚动事件监听
       ChatDialog.$el.addEventListener('scroll', this.scrollListener);
@@ -667,6 +670,39 @@ export default {
       }
     },
 
+    /**
+     * 初始化内容变化监听
+     */
+    init_content_observer() {
+      const ChatDialog = this.$refs['ChatDialog'];
+      if (!ChatDialog) return;
+
+      // 创建MutationObserver监听内容变化
+      this.contentObserver = new MutationObserver(throttle(function() {
+        this.update_scroller_visibility();
+      }.bind(this), 128));
+
+      // 配置监听选项
+      const config = { 
+        childList: true, 
+        subtree: true, 
+        characterData: true 
+      };
+
+      // 开始监听
+      this.contentObserver.observe(ChatDialog.$el, config);
+    },
+
+    /**
+     * 清理内容变化监听
+     */
+    cleanup_content_observer() {
+      if (this.contentObserver) {
+        this.contentObserver.disconnect();
+        this.contentObserver = null;
+      }
+    },
+
     on_(...args) {
       console.log(...args);
     }
@@ -675,9 +711,11 @@ export default {
     this.reset_scroller();
     this.update_scroller_visibility();
     this.init_scroll_listener();
+    this.init_content_observer();
   },
   beforeDestroy() {
     this.cleanup_scroll_listener();
+    this.cleanup_content_observer();
   },
 }
 </script>

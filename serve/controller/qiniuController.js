@@ -43,10 +43,19 @@ const chatStreamModel = async (req, res) => {
     }
 };
 
-// // 接受请求：语音识别
-// const chatASR = async(req, res) => {
-
-// }
+// 接受请求：语音识别
+const asr = async(req, res) => {
+    try {
+        const { audioUrl, audioType } = req.body;
+        if (!audioUrl || !audioType) {
+            return res.status(400).json({ error: '请求参数缺失' });
+        }
+        const result = await qiniuService.asr({ audioUrl, audioType });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: '语音识别失败', detail: err.message });
+    }
+}
 
 // 接受请求：获取音色列表
 const getVoice = async(req, res) => {
@@ -76,6 +85,7 @@ module.exports = {
     getModel,
     chatModel,
     chatStreamModel,
+    asr,
     getVoice,
     tts,
 };

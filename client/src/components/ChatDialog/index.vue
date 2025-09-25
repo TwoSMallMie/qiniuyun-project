@@ -77,9 +77,11 @@
 import { marked } from 'marked';
 import copyToClipboard from '@/utils/copyToClipboard/index.js'; //这里引用了copyToClipboard函数
 
+
 export default {
   name: 'ChatDialog',
   props: {
+    /**聊天消息列表*/
     messages: {
       type: Array,
       required: true
@@ -122,6 +124,65 @@ export default {
     /***************************************************************
      * 工具函数集合 helper
      ***************************************************************/
+    /**
+     * markdown 转 text，简易实现
+     * @param md markdown
+     */
+    mdToText(md) {
+      // 去除标题（# 标题）
+      let text = md.replace(/^#+\s*(.*)$/gm, '$1');
+      
+      // 去除加粗/斜体（**text** 或 *text*）
+      text = text.replace(/\*\*(.*?)\*\*/g, '$1');
+      text = text.replace(/\*(.*?)\*/g, '$1');
+      
+      // 去除链接（[text](url)）
+      text = text.replace(/\[(.*?)\]\(.*?\)/g, '$1');
+      
+      // 去除图片（![alt](url)）
+      text = text.replace(/!\[(.*?)\]\(.*?\)/g, '$1');
+      
+      // 去除列表（- * 1.）
+      text = text.replace(/^[-*+]\s*(.*)$/gm, '$1');
+      text = text.replace(/^\d+\.\s*(.*)$/gm, '$1');
+      
+      // 去除代码块（`code` 或 ```code```）
+      text = text.replace(/`(.*?)`/g, '$1');
+      text = text.replace(/^```[\s\S]*?^```/gm, '');
+      
+      // 去除引用（> text）
+      text = text.replace(/^>\s*(.*)$/gm, '$1');
+      
+      // 去除多余空行
+      text = text.replace(/\n{3,}/g, '\n\n');
+      
+      return text.trim();
+    },
+
+    /**
+     * markdown 转 html
+     * @param md markdown
+     */
+    mdToHtml(md) {
+      // 转换markdown为html
+      return marked.parse(md);
+    },
+
+    /**
+     * text 转 html
+     * @param text 文本
+     */
+    textToHtml(text) {
+      // 将文本套进p标签
+      return `<p>
+                ${text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;")}
+              </p>`;
+    },
 
 
      
@@ -134,6 +195,22 @@ export default {
     /***************************************************************
      * 事件函数集合(部分) onevent_part
      ***************************************************************/
+    /**
+     * 
+     * @param text 要复制的文本
+     * @param callback 转换函数
+     */
+    copyToClipboard(text, callback=(a)=>a) {
+      try {
+        // 转换文本格式
+        const transformedText = callback(text);
+        // 复制到剪贴板
+        copyToClipboard(transformedText);
+      }
+      catch (error) {
+        console.error('复制到剪贴板失败:', error);
+      }
+    },
 
 
     /***************************************************************
@@ -161,14 +238,22 @@ export default {
      */
     async onClick_copy(msg) {
       if (msg.copy) {
-        try {
-          await copyToClipboard(msg.content);
+        if (msg.role === 'assistant') {
+          this.copyToClipboard(msg.content, this.mdToText);
         }
-        catch (error) {
-          console.error('复制失败', error);
+        else if (msg.role === 'user') {
+          this.copyToClipboard(msg.content);
+        }
+        else {
+          this.copyToClipboard(msg.content);
         }
       }
     },
+
+    /**
+     * 点击重新思考
+     * @param idx 要重新思考的消息的下标
+     */
     onClick_reThinking(idx) {
       this.$emit('reThinking', idx);
     },
@@ -178,27 +263,19 @@ export default {
      * 其他函数集合 other
      ***************************************************************/
     /**
-     * 将markdown字符串转为html
+     * 处理助手文本，将md格式文本转为html
      * @param content md字符串
      */
     renderContent_assistant(content) {
-      // 支持 markdown 渲染
-      return marked(content || '');
+      return this.mdToHtml(content || '');
     },
 
     /**
-     * 将markdown字符串转为html，同时处理特殊字符
-     * @param content md字符串
+     * 处理用户文本，并处理特殊字符，并套在p标签内
+     * @param content 字符串
      */
     renderContent_user(content) {
-      return marked(
-        content
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;")
-      )
+      return this.textToHtml(content);
     },
 
 

@@ -1,8 +1,6 @@
 const axios = require('axios');
+const { QINIU_MODEL_API_URL, QINIU_ACCESS_TOKEN } = require('../qiniu');
 
-// 七牛云模型推理API地址
-const QINIU_MODEL_API_URL = 'https://api.qnaigc.com/v1';
-const QINIU_ACCESS_TOKEN = 'sk-6e04767d16a9342629f42ef580a485520a46b2b37b84bcf08d4c8066641ec578';
 
 // 获取可用模型列表
 async function getModel() {
@@ -71,13 +69,13 @@ async function chatModel({ messages, stream = false, search = false, res = null 
 }
 
 // 语音识别
-async function chatASR({ file_url }) {
+async function asr({ audioUrl, audioType = 'mp3' }) {
     // 构造请求体
     const postData = {
         "model": "asr",
         "audio": {
-            "format": "mp3",
-            "url": file_url,
+            "format": audioType,
+            "url": audioUrl,
         }
     };
 
@@ -93,19 +91,18 @@ async function chatASR({ file_url }) {
     const url = QINIU_MODEL_API_URL + '/voice/asr';
 
     // 发送请求
-    // console.log('发送了请求', url);
-    // console.log('请求参数', postData);
-    // console.log('是否流式输出', stream, '是否联网', search);
+    console.log('发送了请求', url);
+    console.log('请求参数', postData);
+    console.log('声音url', audioUrl, '声音类型', audioType);
     const response = await axios.post(
         url,
         postData,
         axiosConfig
     );
 
-    console.log(response);
+    console.log(response.data);
 
-    return response;
-    
+    return response.data;
 }
 
 // 获取音色列表
@@ -169,7 +166,7 @@ async function tts({ text='', voiceType='' }) {
 module.exports = {
     getModel,
     chatModel,
-    chatASR,
+    asr,
     getVoice,
     tts,
 };

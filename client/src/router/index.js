@@ -7,7 +7,7 @@ const routes = [
   {
     path: '/',
     name: 'ApiTest',
-    component: () => import('../views/ApiTestView.vue')
+    component: () => import('../views/test.vue')
   },
   // 其他路由...
   {

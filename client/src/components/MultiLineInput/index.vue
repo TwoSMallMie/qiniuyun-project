@@ -8,16 +8,20 @@
         v-model="inputValue"
         :placeholder="placeholder"
         rows="6"
+        maxlength="2000"
         class="textarea"
+        @click="onClick_stopAsr"
         @input="onInput"
         @keydown.enter.exact.prevent="handleSubmit"
-      ></textarea>
+      >
+      </textarea>
     </div>
 
     <div style="margin-top:8px;color:#666;font-size:14px;">当前字符数: {{ inputValue.length }}</div>
     
     <!-- 提交按钮列表 -->
     <div class="submit-list">
+      <!-- 麦克风/语音输入 -->
       <div
         class="microphone"
         :class="{ active: microphone }"
@@ -28,6 +32,8 @@
           <path d="M192.90909131 471.09090869a319.09090869 319.09090869 0 0 0 638.18181738 0 32.72727305 32.72727305 0 1 0-65.45454521 0 253.63636348 253.63636348 0 0 1-507.27272695 0 32.72727305 32.72727305 0 1 0-65.45454522 0z" p-id="5256"></path><path d="M479.27272695 757.45454521v131.85a32.72727305 32.72727305 0 1 0 65.4545461 0V757.45454521a32.72727305 32.72727305 0 1 0-65.4545461 0z"></path>
           <path d="M409.72727305 953.81818174h206.87727216a32.72727305 32.72727305 0 1 0 0-65.45454522H409.72727305a32.72727305 32.72727305 0 1 0 0 65.45454522z"></path></svg>
       </div>
+
+      <!-- 提交按钮 -->
       <button
         type="submit"
         class="submit-button"
@@ -47,28 +53,26 @@
 </template>
 
 <script>
+import { throttle } from '@/utils/helper';
+
+// import request from '@/utils/request';
+
 export default {
   name: 'MultiLineInput',
   props: {
-    /**
-     * 绑定的输入内容
-     */
+    /**绑定的输入内容*/
     value: {
       type: String,
       default: ''
     },
 
-    /**
-     * 输入框的占位符
-     */
+    /**输入框的占位符*/
     placeholder: {
       type: String,
       default: '',
     },
 
-    /**
-     * 提交按钮的类型，submit表示提交，pause表示暂停
-     */
+    /**提交按钮的类型，submit表示提交，pause表示暂停*/
     submitType: {
       type: String,
       default: 'submit'
@@ -76,15 +80,20 @@ export default {
   },
   data() {
     return {
-      /**
-       * 输入框文本
-       */
+      /**输入框文本*/
       inputValue: this.value,
 
-      /**
-       * 麦克风是否被开启
-       */
+      /**临时识别结果*/
+      temp_inputValue: '',
+
+      /**麦克风是否被开启*/
       microphone: false,
+
+      /**WebSocket实例*/
+      ws: null,
+
+      /**语音识别对象*/
+      recognition: null,
     };
   },
   watch: {
@@ -111,6 +120,160 @@ export default {
     /***************************************************************
      * 事件函数集合(部分) onevent_part
      ***************************************************************/
+    /**
+     * 重置输入框的文本内容
+     * @param value 输入框的文本内容
+     */
+    reset_inputValue(value) {
+      this.$emit('input', value);
+    },
+
+    /**
+     * 测试七牛云语音识别 - 启动语音输入
+     */
+    async QiniuAsr() {
+      try {
+        // 检查浏览器是否支持语音识别
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+          alert('您的浏览器不支持语音识别功能，请使用Chrome、Edge或Safari等现代浏览器');
+          return;
+        }
+
+        // 保存当前输入框的文本
+        this.temp_inputValue = this.inputValue;
+
+        // 初始化WebSocket连接（如果尚未连接）
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          this.initializeWebSocket();
+          
+          // 等待WebSocket连接建立
+          await new Promise((resolve) => {
+            const checkConnection = () => {
+              if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                resolve();
+              }
+              else {
+                setTimeout(checkConnection, 100);
+              }
+            };
+            setTimeout(checkConnection, 100);
+          });
+        }
+
+        // 创建语音识别对象
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        this.recognition = new SpeechRecognition();
+        
+        // 配置语音识别参数
+        this.recognition.lang = 'zh-CN'; // 设置语言为中文
+        this.recognition.continuous = true; // 连续识别
+        this.recognition.interimResults = true; // 返回临时结果
+        this.recognition.maxAlternatives = 1; // 最大备选结果数
+
+        // 开始识别事件
+        this.recognition.onstart = () => {
+          console.log('语音识别已启动');
+        };
+
+        // 识别结果事件
+        this.recognition.onresult = (event) => {
+          let finalTranscript = '';
+          let interimTranscript = '';
+
+          // 处理识别结果
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript;
+            }
+            else {
+              interimTranscript += transcript;
+            }
+          }
+
+          // 如果是临时结果，设置输入框为临时变量和生成结果
+          if (interimTranscript) {
+            console.log('临时识别结果:', interimTranscript);
+            // 临时识别结果添加至输入框
+            this.reset_inputValue(this.temp_inputValue + interimTranscript);
+          }
+
+          // 如果是最终结果，信息发送到WebSocket服务器，设置输入框为最终结果
+          if (finalTranscript && this.ws && this.ws.readyState === WebSocket.OPEN) {
+            console.log('发送最终识别结果到服务器:', finalTranscript);
+
+            // 临时识别结果添加至输入框
+            this.reset_inputValue(this.temp_inputValue + finalTranscript);
+            this.temp_inputValue = this.temp_inputValue + finalTranscript;
+            
+            // 发送音频数据到WebSocket服务器
+            const audioData = {
+              type: 'audio_data',
+              data: finalTranscript, // 这里可以改为实际的音频数据
+              isFinal: true
+            };
+            
+            this.ws.send(JSON.stringify(audioData));
+          }
+        };
+
+        // 识别错误事件
+        this.recognition.onerror = (event) => {
+          console.error('语音识别错误:', event.error);
+          
+        };
+
+        // 识别结束事件
+        this.recognition.onend = () => {
+          console.log('语音识别已结束');
+        };
+
+        // 请求麦克风权限并开始识别
+        try {
+          // 请求麦克风权限
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          
+          // 停止媒体流（我们只是需要权限，不需要实际的音频流）
+          stream.getTracks().forEach(track => track.stop());
+          
+          // 开始语音识别
+          this.recognition.start();
+        }
+        catch (error) {
+          console.error('获取麦克风权限失败:', error);
+          this.stopAsr();
+        }
+      }
+      catch (error) {
+        console.error('启动语音识别失败:', error);
+        this.stopAsr();
+      }
+    },
+
+    /**
+     * 结束语音识别和断开WebSocket连接
+     */
+    stopAsr() {
+      // 停止语音识别
+      if (this.recognition) {
+        this.recognition.stop();
+        this.recognition = null;
+        console.log('语音识别已停止');
+      }
+      
+      // 关闭WebSocket连接
+      if (this.ws) {
+        this.ws.close();
+        this.ws = null;
+        console.log('WebSocket连接已断开');
+      }
+      
+      // 重置麦克风状态
+      this.microphone = false;
+    },
+
+    
+
 
 
     /***************************************************************
@@ -120,7 +283,7 @@ export default {
      * 输入内容变化时，更新绑定的值
      */
     onInput() {
-      this.$emit('input', this.inputValue);
+      this.reset_inputValue(this.inputValue);
     },
 
     /**
@@ -135,16 +298,111 @@ export default {
     /**
      * 开启或关闭麦克风
      */
-    onClick_microphone() {
+    onClick_microphone: throttle(async function() {
       this.microphone = !this.microphone;
-    },
+
+      // 若麦克风被开启
+      if (this.microphone) {
+        try {
+          // 若麦克风被开启，则启动语音识别
+          this.QiniuAsr();
+        }
+        catch (error) {
+          console.error('录制声音失败', error);
+          return;
+        }
+      }
+      // 若麦克风被关闭
+      else {
+        // 若麦克风被关闭，则停止语音识别
+        this.stopAsr();
+      }
+    }, 500),
+
+    /**
+     * 点击停止语音识别按钮
+     */
+    onClick_stopAsr: throttle(function() {
+      // 若麦克风被开启
+      if (this.microphone) {
+        // 若麦克风被开启，则停止语音识别
+        this.stopAsr();
+      }
+    }, 500),
 
 
     /***************************************************************
      * 其他函数集合 other
      ***************************************************************/
-    
+    /**
+     * 初始化WebSocket连接
+     */
+    initializeWebSocket() {
+      try {
+        // 创建WebSocket连接（连接到本地WebSocket服务器）
+        this.ws = new WebSocket('ws://localhost:3001');
+        
+        this.ws.onopen = () => {
+          console.log('WebSocket连接已建立');
+          // 发送配置信息
+          this.sendAsrConfig();
+        };
+        
+        this.ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'recognition_result' && data.text) {
+              console.log('识别结果:', data.text);
 
+              // 自动提交聊天
+              if (data.isFinal) {
+                this.submitChat();
+              }
+            } else if (data.type === 'connected') {
+              console.log('服务器连接确认:', data.message);
+            } else if (data.type === 'asr_disconnected') {
+              console.warn('ASR服务断开:', data.message);
+            } else if (data.type === 'asr_error') {
+              console.error('ASR服务错误:', data.message);
+            }
+          } catch (error) {
+            console.error('解析WebSocket消息失败:', error);
+          }
+        };
+        
+        this.ws.onerror = (error) => {
+          console.error('WebSocket错误:', error);
+        };
+        
+        this.ws.onclose = () => {
+          console.log('WebSocket连接已关闭');
+        };
+        
+      } catch (error) {
+        console.error('创建WebSocket连接失败:', error);
+      }
+    },
+    /**
+     * 发送ASR配置到WebSocket服务器
+     */
+    sendAsrConfig() {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        const config = {
+          type: 'config',
+          data: {
+            token: this.qiniuToken,
+            format: 'pcm',
+            sampleRate: 16000,
+            channels: 1,
+            language: 'zh-CN'
+          }
+        };
+        
+        this.ws.send(JSON.stringify(config));
+        console.log('ASR配置已发送');
+      }
+    },
   }
 };
 </script>
@@ -159,6 +417,7 @@ export default {
   resize: none;
   box-sizing: border-box;
   outline: none;
+  line-height: 21px;
 }
 
 .submit-list {

@@ -5,11 +5,16 @@ const mysql = require('mysql');
 const { db } = require('./db');
 const userController = require('./controller/userController');
 const qiniuController = require('./controller/qiniuController');
+const ASRWebSocketServer = require('./asrWebSocketServer');
 const app = express();
 const port = 3000;
 
 app.use(cors());
 app.use(express.json());
+
+// 启动WebSocket语音识别服务器
+const asrWebSocketServer = new ASRWebSocketServer(3001);
+asrWebSocketServer.start();
 
 app.get('/api/hello', (req, res) => {
   res.json({ message: 'Hello from serve backend!' });
@@ -48,6 +53,10 @@ app.post('/api/qiniu/chat', qiniuController.chatModel);
 app.post('/api/qiniu/chat-stream', qiniuController.chatStreamModel);
 
 
+// 语音识别
+app.post('/api/qiniu/asr', qiniuController.asr);
+
+
 // 获取七牛云音色列表
 app.get('/api/qiniu/voice', qiniuController.getVoice);
 
@@ -58,4 +67,5 @@ app.post('/api/qiniu/tts', qiniuController.tts);
 // node serve 启动
 app.listen(port, () => {
   console.log(`Serve backend running at http://localhost:${port}`);
+  console.log(`ASR WebSocket server running at ws://localhost:3001`);
 });
