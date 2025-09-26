@@ -4,7 +4,7 @@ const db = mysql.createConnection({
   host: 'localhost',
   user: 'root',
   password: '123456', // 密码
-  database: 'testdb'   // 数据库
+  database: 'qiniuProject'   // 数据库
 });
 
 db.connect((err) => {
