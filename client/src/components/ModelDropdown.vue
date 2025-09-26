@@ -10,7 +10,7 @@
       <div v-for="item in options" :key="item.value" class="dropdown-item" @click="onSelect(item)">
         <div class="item-row">
           <span class="item-label">{{ item.label }}</span>
-          <span class="item-desc">{{ item.desc }}</span>
+          <span class="item-desc"></span>
           <span v-if="selected.value === item.value" class="item-check">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" stroke="#165DFF" stroke-width="2"/><circle cx="9" cy="9" r="5" fill="#165DFF"/></svg>
           </span>
@@ -53,7 +53,7 @@ export default {
     },
     onSelect(item) {
       this.open = false;
-      this.$emit('select', item.value);
+      this.$emit('select', item);
     }
   }
 }

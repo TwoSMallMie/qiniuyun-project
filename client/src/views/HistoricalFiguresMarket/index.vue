@@ -106,7 +106,12 @@ export default {
      */
     async onClick_selectCard(id) {
       const res = await this.getHistoricalFiguresModel(id);
-      this.modelDropdownItems_set(res);
+      this.modelDropdownItems_set(res.map(item => ({
+        value: item.id,
+        label: item.name,
+        prompt: item.prompt,
+        figureId: item.figureId,
+      })));
     }
   },
   created() {

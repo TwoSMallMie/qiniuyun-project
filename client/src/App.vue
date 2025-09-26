@@ -107,8 +107,8 @@ export default {
   },
   computed: {
     ...mapState({
-      modelDropdownItems: state => state.chatView.modelDropdownItems, // 下拉列表选项
-      selectedModel: state => state.chatView.selectedModel, // 下拉菜单选中项
+      modelDropdownItems: state => state.modelDropdownItems, // 下拉列表选项
+      selectedModel: state => state.selectedModel, // 下拉菜单选中项
     }),
   },
   methods: {
@@ -203,6 +203,7 @@ export default {
         value: item.id,
         label: item.name,
         prompt: item.prompt,
+        figureId: item.figureId,
       })));
     }).call(this);
   },
