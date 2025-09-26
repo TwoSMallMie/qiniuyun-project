@@ -1,7 +1,7 @@
 <!-- 文本输入框 -->
 
 <template>
-  <form @submit.prevent="handleSubmit">
+  <form @submit.prevent="onSubmit">
     <!-- 文本框 -->
     <div style="margin-top:8px;">
       <textarea
@@ -24,13 +24,16 @@
       <!-- 麦克风/语音输入 -->
       <div
         class="microphone"
-        :class="{ active: microphone }"
         @click="onClick_microphone"
       >
-        <svg viewBox="0 0 1024 1024"  width="18" height="18" fill="white">
+        <svg v-show="!microphone" viewBox="0 0 1024 1024"  width="18" height="18" fill="white">
           <path d="M512 62a184.09090869 184.09090869 0 0 1 184.09090869 184.09090869v204.54545478a184.09090869 184.09090869 0 1 1-368.18181738 1e-8v-204.54545479A184.09090869 184.09090869 0 0 1 512 62z m0 65.45454521a118.63636348 118.63636348 0 0 0-118.63636348 118.63636348v204.54545479a118.63636348 118.63636348 0 1 0 237.27272695 0v-204.54545479A118.63636348 118.63636348 0 0 0 512 127.45454521z"></path>
           <path d="M192.90909131 471.09090869a319.09090869 319.09090869 0 0 0 638.18181738 0 32.72727305 32.72727305 0 1 0-65.45454521 0 253.63636348 253.63636348 0 0 1-507.27272695 0 32.72727305 32.72727305 0 1 0-65.45454522 0z" p-id="5256"></path><path d="M479.27272695 757.45454521v131.85a32.72727305 32.72727305 0 1 0 65.4545461 0V757.45454521a32.72727305 32.72727305 0 1 0-65.4545461 0z"></path>
-          <path d="M409.72727305 953.81818174h206.87727216a32.72727305 32.72727305 0 1 0 0-65.45454522H409.72727305a32.72727305 32.72727305 0 1 0 0 65.45454522z"></path></svg>
+          <path d="M409.72727305 953.81818174h206.87727216a32.72727305 32.72727305 0 1 0 0-65.45454522H409.72727305a32.72727305 32.72727305 0 1 0 0 65.45454522z"></path>
+        </svg>
+        <svg v-show="microphone" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+          <path d="M365.014704 657.815846H657.084939V365.74561H365.014704V657.815846z m584.140471-146.035118c0-240.906781-197.125482-438.105353-438.105353-438.105353-240.979872 0-438.105353 197.198572-438.105354 438.105353 0 240.979872 197.125482 438.178444 438.105354 438.178444 240.979872 0 438.105353-197.198572 438.105353-438.178444zM511.634547 0.730906c281.399001 0 511.634547 230.235546 511.634547 511.634547s-230.235546 511.634547-511.634547 511.634547-511.634547-230.235546-511.634547-511.634547 230.235546-511.634547 511.634547-511.634547z" fill="white"></path>
+        </svg>
       </div>
 
       <!-- 提交按钮 -->
@@ -53,7 +56,7 @@
 </template>
 
 <script>
-import { throttle } from '@/utils/helper';
+import { debounce } from '@/utils/helper';
 
 // import request from '@/utils/request';
 
@@ -83,8 +86,8 @@ export default {
       /**输入框文本*/
       inputValue: this.value,
 
-      /**临时识别结果*/
-      temp_inputValue: '',
+      /**用来按顺序存语音识别的所有片段*/
+      asrBuffer: [],
 
       /**麦克风是否被开启*/
       microphone: false,
@@ -114,7 +117,12 @@ export default {
     /***************************************************************
      * 数据函数集合 data
      ***************************************************************/
-
+    initData() {
+      this.asrBuffer = [];
+      this.microphone = false;
+      this.ws = null;
+      this.recognition = null;
+    },
 
 
     /***************************************************************
@@ -126,6 +134,18 @@ export default {
      */
     reset_inputValue(value) {
       this.$emit('input', value);
+    },
+
+    /**
+     * 提交聊天内容
+     * @param {string} inputValue 要提交的聊天内容，默认值为当前输入框的文本内容
+     */
+    submitChat(inputValue=this.inputValue) {
+      // 若此时在录音阶段，关闭录音在提交
+      if (this.microphone) {
+        this.onClick_stopAsr();
+      }
+      this.$emit('submit', inputValue);
     },
 
     /**
@@ -177,50 +197,47 @@ export default {
 
         // 识别结果事件
         this.recognition.onresult = (event) => {
-          let finalTranscript = '';
-          let interimTranscript = '';
+          let finalTranscript = ''
+          let interimTranscript = ''
 
-          // 处理识别结果
           for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
+            const piece = event.results[i][0].transcript
             if (event.results[i].isFinal) {
-              finalTranscript += transcript;
-            }
-            else {
-              interimTranscript += transcript;
+              finalTranscript += piece
+            } else {
+              interimTranscript += piece
             }
           }
 
-          // 如果是临时结果，设置输入框为临时变量和生成结果
-          if (interimTranscript) {
+          // 临时结果：只做界面预览，不进缓冲区
+          if (interimTranscript && this.recognition) {
             console.log('临时识别结果:', interimTranscript);
-            // 临时识别结果添加至输入框
-            this.reset_inputValue(this.temp_inputValue + interimTranscript);
+            
+            this.reset_inputValue([...this.asrBuffer, interimTranscript].join(''))
           }
 
-          // 如果是最终结果，信息发送到WebSocket服务器，设置输入框为最终结果
-          if (finalTranscript && this.ws && this.ws.readyState === WebSocket.OPEN) {
-            console.log('发送最终识别结果到服务器:', finalTranscript);
+          // 最终结果：整块压入缓冲区，再一次性写回
+          if (finalTranscript && this.recognition) {
+            console.log('最终识别结果:', finalTranscript);
+            this.asrBuffer.push(finalTranscript)
+            const fullText = this.asrBuffer.join('').trim()
+            this.reset_inputValue(fullText)
 
-            // 临时识别结果添加至输入框
-            this.reset_inputValue(this.temp_inputValue + finalTranscript);
-            this.temp_inputValue = this.temp_inputValue + finalTranscript;
-            
-            // 发送音频数据到WebSocket服务器
-            const audioData = {
-              type: 'audio_data',
-              data: finalTranscript, // 这里可以改为实际的音频数据
-              isFinal: true
-            };
-            
-            this.ws.send(JSON.stringify(audioData));
+            // 把最终文本也发给后端
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+              this.ws.send(JSON.stringify({
+                type: 'audio_data',
+                data: fullText,
+                isFinal: true
+              }))
+            }
           }
         };
 
         // 识别错误事件
         this.recognition.onerror = (event) => {
-          console.error('语音识别错误:', event.error);
-          
+          console.error('语音识别异常:', event.error);
+          this.stopAsr();
         };
 
         // 识别结束事件
@@ -257,19 +274,16 @@ export default {
       // 停止语音识别
       if (this.recognition) {
         this.recognition.stop();
-        this.recognition = null;
         console.log('语音识别已停止');
       }
       
       // 关闭WebSocket连接
       if (this.ws) {
         this.ws.close();
-        this.ws = null;
         console.log('WebSocket连接已断开');
       }
-      
-      // 重置麦克风状态
-      this.microphone = false;
+
+      this.initData();
     },
 
     
@@ -289,16 +303,29 @@ export default {
     /**
      * 提交按钮点击时的处理
      */
+    onSubmit() {
+      // 若输入文本为空且不在聊天状态内（submitType不为pause），则不提交
+      if (this.inputValue.trim().length === 0 && this.submitType === 'submit') return;
+      // 提交聊天内容
+      this.submitChat(this.inputValue);
+    },
+
+    /**
+     * 回车时的处理
+     */
     handleSubmit() {
       // 若输入文本为空且不在聊天状态内（submitType不为pause），则不提交
       if (this.inputValue.trim().length === 0 && this.submitType === 'submit') return;
-      this.$emit('submit', this.inputValue);
+      // 若提交类型为暂停，则不提交
+      if (this.submitType === 'pause') return;
+      // 提交聊天内容
+      this.submitChat(this.inputValue);
     },
     
     /**
      * 开启或关闭麦克风
      */
-    onClick_microphone: throttle(async function() {
+    onClick_microphone: debounce(async function() {
       this.microphone = !this.microphone;
 
       // 若麦克风被开启
@@ -317,18 +344,18 @@ export default {
         // 若麦克风被关闭，则停止语音识别
         this.stopAsr();
       }
-    }, 500),
+    }, 256),
 
     /**
      * 点击停止语音识别按钮
      */
-    onClick_stopAsr: throttle(function() {
+    onClick_stopAsr: debounce(function() {
       // 若麦克风被开启
       if (this.microphone) {
         // 若麦克风被开启，则停止语音识别
         this.stopAsr();
       }
-    }, 500),
+    }, 256),
 
 
     /***************************************************************
@@ -354,11 +381,6 @@ export default {
             
             if (data.type === 'recognition_result' && data.text) {
               console.log('识别结果:', data.text);
-
-              // 自动提交聊天
-              if (data.isFinal) {
-                this.submitChat();
-              }
             } else if (data.type === 'connected') {
               console.log('服务器连接确认:', data.message);
             } else if (data.type === 'asr_disconnected') {
@@ -403,7 +425,11 @@ export default {
         console.log('ASR配置已发送');
       }
     },
-  }
+  },
+  beforeDestroy() {
+    // 组件销毁时，关闭WebSocket连接
+    this.stopAsr();
+  },
 };
 </script>
 
@@ -430,28 +456,20 @@ export default {
 .microphone {
   width: 32px;
   height: 32px;
-  border: 1px solid #00000000;
   border-radius: 50%;
-  background: #2563eb;
+  background: var(--blue-2);
   display:inline-flex;
   justify-content: center;
   align-items: center;
+  transition: transform 0.2s;
 }
 .microphone:hover {
-  background: #1d4ed8;
-  cursor: pointer;
-}
-
-.microphone.active {
-  background: #92b1f5;
-}
-.microphone.active:hover {
-  background: #8ea6eb;
+  background: var(--blue-2-hover);
   cursor: pointer;
 }
 
 .submit-button {
-  background: #92b1f5;
+  background: var(--blue-1);
   color:#fff;
   padding:6px 24px;
   border:none;
@@ -462,15 +480,14 @@ export default {
   transition: background-color 0.3s;
 }
 .submit-button:hover {
-  background-color: #8ea6eb;
   cursor: not-allowed;
 }
 
 .submit-button.active {
-  background: #2563eb;
+  background: var(--blue-2);
 }
 .submit-button.active:hover {
-  background: #1d4ed8;
+  background: var(--blue-2-hover);
   cursor: pointer;
 }
 

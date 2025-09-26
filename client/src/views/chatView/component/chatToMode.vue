@@ -25,7 +25,6 @@
 
 <script>
 import { mapState, mapMutations } from 'vuex';
-import { marked } from 'marked';
 
 import request from '@/utils/request';
 import { createChatResult } from '@/views/chatView/chatResult';
@@ -44,40 +43,29 @@ export default {
 	},
 	data() {
     return {
-      /**
-       * 聊天读取器
-       */
+      /**聊天读取器*/
       chatReader: null,
 
-      /**
-       * 请求取消控制器
-       */
+      /**请求取消控制器*/
       chatAbortController: null,
 
-      /**
-       * 是否在聊天
-       */
+      /**是否在聊天*/
       isChat: false,
 
-      /**
-       * 是否联网搜索
-       */
+      /**是否联网搜索*/
       isSearch: true,
 
-      /**
-       * 快速下拉浮标是否可见
-       */
+      /**快速下拉浮标是否可见*/
       scroller_visible: false,
 
-      /**
-       * 滚动事件监听器
-       */
+      /**滚动事件监听器*/
       scrollListener: null,
 
-      /**
-       * DOM内容变化监听器
-       */
+      /**DOM内容变化监听器*/
       contentObserver: null,
+
+      /**浏览器大小变化监听器*/
+      browserSizeListener: null,
     }
   },
   computed: {
@@ -85,6 +73,7 @@ export default {
       chatText: state => state.chatView.chatText, // 用户输入的聊天文本内容
       chatResult: state => state.chatView.chatResult, // 聊天结果
       audioMap: state => state.chatView.audioMap, // 音频列表
+      promptText: state => state.chatView.promptText, // 提示文本
     }),
 
     /**
@@ -105,12 +94,14 @@ export default {
       audioMap_setByIndex: 'chatView/audioMap_setByIndex',
       audioMap_deleteByIndex: 'chatView/audioMap_deleteByIndex',
       audioMap_getByIndex: 'chatView/audioMap_getByIndex',
+      audioMap_clear: 'chatView/audioMap_clear',
     }),
     /***************************************************************
      * 外部调用函数集合 func
      ***************************************************************/
     submit(e) {
       this.onSubmit_toChat(e);
+      
       this.$nextTick(() => {
         this.reset_scroller();
         this.update_scroller_visibility();
@@ -127,7 +118,14 @@ export default {
     /***************************************************************
      * 数据函数集合 _data_
      ***************************************************************/
-
+    /**
+     * 初始化一些聊天相关数据
+     */
+    initChatData() {
+      this.isChat = false; // 标记为未在聊天
+      this.chatReader = null; // 清除读取器
+      this.chatAbortController = null; // 清除取消控制器
+    },
 
 
     /***************************************************************
@@ -146,15 +144,6 @@ export default {
 
       //滚动至底部
       ChatDialog.$el.scrollTo({ top: ChatDialog.$el.scrollHeight, behavior: "smooth" });
-    },
-
-    /**
-     * 初始化一些聊天相关数据
-     */
-    initChatData() {
-      this.isChat = false; // 标记为未在聊天
-      this.chatReader = null; // 清除读取器
-      this.chatAbortController = null; // 清除取消控制器
     },
 
     /**
@@ -180,6 +169,18 @@ export default {
         this.chatAbortController = new AbortController(); // 创建取消控制器
         let response; // 保存响应对象
 
+        // 设置请求体
+        const requestBody = {
+          search: this.isSearch,
+          messages: [{
+            "role": "user",
+            "content": this.promptText
+          }].concat(this.chatResult.slice(0, -1).map(item=>({
+            "role": item.role,
+            "content": item.content
+          })))
+        };
+
         // 进行请求
         try {
           response = await fetch('http://localhost:3000/api/qiniu/chat-stream', {
@@ -187,7 +188,7 @@ export default {
             headers: {
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ messages: this.chatResult.slice(0, -1), search: this.isSearch }),
+            body: JSON.stringify(requestBody),
             signal: this.chatAbortController.signal
           });
         } 
@@ -276,7 +277,7 @@ export default {
 
       // 请求完成，助手关闭思考，直接删除，在添加一段空文本数据
       this.chatResult_splice([-1]);
-      this.chatResult_push(createChatResult('assistant', '', {reThinking: true})); // 添加空文本数据
+      this.chatResult_push(createChatResult('assistant', '', {})); // 添加空文本数据
 
       try {
         // 读取文字
@@ -294,7 +295,7 @@ export default {
         // 读取失败
         if (e.msg !== '读取被中止') {
           this.chatResult_splice([-1]); //删除
-          this.chatResult_push(createChatResult('assistant', '⚠️ 生成失败')); // 添加错误消息
+          this.chatResult_push(createChatResult('assistant', '⚠️ 生成失败，请重试', {reThinking: true})); // 添加错误消息
         }
       }
       
@@ -315,9 +316,11 @@ export default {
        * @returns {object | null} 响应数据 null表示请求失败
        */
       async function requestTextToSpeech(text, voiceType) {
-        // 文本可能时md格式，需要转换为纯文本形式
-        text = marked(text); // 转换为html
-        text = text.replace(/<[^>]+>/g, ''); // 移除html标签
+        // 文本可能包含html占位符如&quot等，需要转换为纯文本形式
+        const htmlReplacements = ['&quot;','&lt;','&gt;','&amp;'];
+        htmlReplacements.forEach(replacement => {
+          text = text.replace(new RegExp(replacement, 'g'), ''); // 替换所有出现的占位符
+        });
 
         // 检查文本是否为空
         if (!text) {
@@ -452,6 +455,39 @@ export default {
       };
     },
 
+    /**
+     * 取消聊天
+     */
+    stopChat() {
+      // 若已建立了读取器，取消流式读取
+      if (this.chatReader) {
+        this.chatReader.cancel();
+      }
+
+      // 取消请求
+      if (this.chatAbortController) {
+        this.chatAbortController.abort();
+      }
+
+      // 重置聊天状态
+      this.initChatData();
+    },
+
+    /**
+     * 取消语音播放
+     */
+    stopAudio() {
+      // 若已建立了音频资源，取消播放
+      if (this.audioMap.size > 0) {
+        this.audioMap.forEach(audio => {
+          audio.pause();
+        });
+      }
+      
+      // 清空音频列表
+      this.audioMap_clear();
+    },
+
 
     /***************************************************************
      * 事件函数集合 onevent
@@ -570,22 +606,13 @@ export default {
     onSubmit_toChat() {
       // 如果正在聊天，则停止请求
       if (this.isChat) {
-        // 若已建立了读取器，取消流式读取
-        if (this.chatReader) {
-          this.chatReader.cancel();
-        }
-
-        // 取消请求
-        if (this.chatAbortController) {
-          this.chatAbortController.abort();
-        }
-
-        // 重置聊天状态
-        this.initChatData();
+        // 取消聊天
+        this.stopChat();
       }
       // 未在聊天在则开始聊天
       else {
         this.QiniuChat();
+        this.ChatDialogToBottom();
       }
     },
     
@@ -608,7 +635,7 @@ export default {
         const height = 8;
         // const width = 0;
 
-        // 计算游标位置            
+        // 计算游标位置
         this.$refs['scroller'].style.left = `${(content_width - scroller_width) / 2}px`;
         this.$refs['scroller'].style.bottom = `${MultiLineInput_height + height}px`;
       }
@@ -674,6 +701,12 @@ export default {
      * 初始化内容变化监听
      */
     init_content_observer() {
+      // 移除旧的监听器
+      if (this.contentObserver) {
+        this.contentObserver.disconnect();
+      }
+      
+      // 创建新的监听器
       const ChatDialog = this.$refs['ChatDialog'];
       if (!ChatDialog) return;
 
@@ -703,6 +736,38 @@ export default {
       }
     },
 
+    /**
+     * 初始化浏览器大小变化监听,，通过animation api 实现平滑过渡
+     */
+    init_browser_size_listener() {
+      // 移除旧的监听器
+      if (this.browserSizeListener) {
+        window.removeEventListener('resize', this.browserSizeListener);
+      }
+
+      // 创建新的监听器
+      this.browserSizeListener = () => {
+        // 使用 requestAnimationFrame 实现平滑过渡
+        requestAnimationFrame(() => {
+          this.reset_scroller();
+          this.update_scroller_visibility();
+        });
+      };
+
+      // 添加浏览器大小变化监听
+      window.addEventListener('resize', this.browserSizeListener);
+    },
+
+    /**
+     * 清除浏览器大小变化监听
+     */
+    cleanup_browser_size_listener() {
+      if (this.browserSizeListener) {
+        window.removeEventListener('resize', this.browserSizeListener);
+        this.browserSizeListener = null;
+      }
+    },
+
     on_(...args) {
       console.log(...args);
     }
@@ -712,10 +777,19 @@ export default {
     this.update_scroller_visibility();
     this.init_scroll_listener();
     this.init_content_observer();
+    this.init_browser_size_listener();
   },
   beforeDestroy() {
+    // 组件销毁时，清理相关的监听
     this.cleanup_scroll_listener();
     this.cleanup_content_observer();
+    this.cleanup_browser_size_listener();
+
+    // 取消聊天
+    this.stopChat();
+
+    // 取消可能的语音播放
+    this.stopAudio();
   },
 }
 </script>

@@ -8,10 +8,12 @@ async function copyToClipboard(text) {
   if (navigator.clipboard) {
     try {
       await navigator.clipboard.writeText(text);
-      console.log('【现代API】复制成功');
-      return;
-    } catch (err) {
-      console.warn('【现代API】复制失败，降级到传统方法', err);
+      // console.log('【现代API】复制成功');
+      return true;
+    }
+    catch (err) {
+      // console.warn('【现代API】复制失败，降级到传统方法', err);
+      return false;
     }
   }
 
@@ -26,14 +28,18 @@ async function copyToClipboard(text) {
   try {
     const successful = document.execCommand('copy');
     if (successful) {
-      console.log('【传统方法】复制成功');
-    } else {
+      // console.log('【传统方法】复制成功');
+      return true;
+    }
+    else {
       throw new Error('execCommand 返回失败');
     }
-  } catch (err) {
-    console.error('【传统方法】复制失败', err);
-    throw err;  // 重新抛出错误供调用方处理
-  } finally {
+  }
+  catch (err) {
+    console.error('复制失败', err);
+    return false;
+  }
+  finally {
     document.body.removeChild(textarea);
   }
 }

@@ -1,168 +1,340 @@
 <template>
   <div id="app">
-    <!-- <nav>
-      <router-link to="/">test</router-link>
-      <router-link to="/chat">chat</router-link>
-    </nav> -->
-    <router-view/>
+    <!-- 侧边栏 -->
+    <div
+      class="sidebar-mask"
+      :class="[{ 'full-screen': !collapsed.nowView && collapsed.viewType === 'small' }]"
+      @click="onClick_toggleSidebarByjudge"
+    >
+      <div
+        :class="['sidebar', { collapsed: collapsed.nowView }]"
+      >
+        <!-- 导航栏内容区域 -->
+        <button
+          v-if="!collapsed.nowView"
+          class="toggle-btn"
+          @click="onClick_toggleSidebar"
+          aria-label="收起"
+        >
+          <svg
+            style="transform: rotate(180deg)"
+            width="28"
+            height="28"
+            viewBox="0 0 28 28"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M9 7L18 14L9 21"
+              stroke="#222c3a"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+        <!-- 真正的导航菜单 -->
+        <sideBarNav
+          v-if="!collapsed.nowView"
+          :value="sideBarNavItems"
+          @select="onSelect"
+        />
+      </div>
+    </div>
+
+    <!-- 主内容区：路由页面会渲染在这里 -->
+    <div class="main-content">
+      <div class="top-content">
+        <!-- 收起或自动收起时按钮在内容区左上角 -->
+        <button
+          v-if="collapsed.nowView"
+          class="toggle-btn main-btn"
+          @click="onClick_toggleSidebar"
+        >
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 28 28"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M9 7L18 14L9 21"
+              stroke="#222c3a"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+        <ModelDropdown ref="ModelDropdown" :options="modelDropdownItems" :selected="selectedModel" @select="onSelect_model"></ModelDropdown>
+      </div>
+      <div class="container">
+        <router-view />
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
+import { mapState, mapMutations } from 'vuex'
+import request from './utils/request'
+
+
+import SideBarNav from '@/components/sideBarNav.vue'
+import ModelDropdown from '@/components/ModelDropdown.vue'
+
 export default {
-  name: 'app',
-  mounted() {
-    /***************************************************************
-     * 外部调用函数集合 func
-     ***************************************************************/
-
-
+  name: 'App',
+  components: { SideBarNav, ModelDropdown },
+  data() {
+    return {
+      /* 侧边栏折叠状态 */
+      collapsed: {
+        bigView: false,      // 大屏时记录
+        smallView: true,     // 小屏时记录
+        nowView: false,      // 当前是否收起
+        viewType: 'big'      // 当前视图 big / small
+      },
+      /** 窗口宽度 */
+      windowWidth: window.innerWidth,
+      /* 导航项，跟 chatView 保持一致 */
+      sideBarNavItems: [
+        { value: 'chat', icon: 'newChat', text: '聊天' },
+        { value: 'historicalFiguresMarket', icon: 'history', text: '历史人物' }
+      ],
+    }
+  },
+  computed: {
+    ...mapState({
+      modelDropdownItems: state => state.chatView.modelDropdownItems, // 下拉列表选项
+      selectedModel: state => state.chatView.selectedModel, // 下拉菜单选中项
+    }),
+  },
+  methods: {
+    ...mapMutations({
+      modelDropdownItems_set: 'modelDropdownItems_set', // 设置下拉列表选项
+      selectedModel_set: 'selectedModel_set', // 设置下拉菜单选中项
+    }),
     
-    /***************************************************************
-     * 工具函数集合 helper
-     ***************************************************************/
+    /**
+     * 下拉菜单选中项改变时触发
+     * @param {string} value 值
+     */
+    onSelect_model(value) {
+      this.selectedModel_set(value);
+    },
 
+    /* 手动切换侧边栏 */
+    onClick_toggleSidebar() {
+      this.collapsed.nowView = !this.collapsed.nowView
+    },
 
-     
-    /***************************************************************
-     * 数据函数集合 data
-     ***************************************************************/
+    /* 响应式断点检测 */
+    checkAutoCollapse() {
+      const old = this.windowWidth
+      const now = window.innerWidth
+      this.windowWidth = now
 
+      if (old > 600 && now <= 600) {
+        /* 大屏 -> 小屏 */
+        this.collapsed.bigView = this.collapsed.nowView
+        this.collapsed.nowView = true
+        this.collapsed.viewType = 'small'
+      } else if (now > 600 && old <= 600) {
+        /* 小屏 -> 大屏 */
+        this.collapsed.smallView = true
+        this.collapsed.nowView = this.collapsed.bigView
+        this.collapsed.viewType = 'big'
+      }
+    },
 
+    /* 点击遮罩时收起（小屏才生效） */
+    onClick_toggleSidebarByjudge(e) {
+      if (this.collapsed.viewType !== 'small' || this.collapsed.nowView) return
+      let target = e.target
+      while (target) {
+        if (target.classList.contains('sidebar')) return   // 点侧边栏内部，不处理
+        if (target.classList.contains('sidebar-mask')) {
+          this.onClick_toggleSidebar()
+          return
+        }
+        target = target.parentNode
+      }
+    },
 
-    /***************************************************************
-     * 事件函数集合(部分) onevent_part
-     ***************************************************************/
+    /**
+     * 点击导航项时触发
+     * @param {number} index 索引
+     */
+    onSelect(value) {
+      switch(value) {
+        case 'chat':
+          // 点击新聊天，跳转到聊天页
+          if (this.activeValue !== 'chat') this.$router.push('/chat')
+          break
+        case 'historicalFiguresMarket':
+          // 点击选择历史人物，跳转到历史人物市场页
+          if (this.activeValue !== 'historicalFiguresMarket') this.$router.push('/historicalFiguresMarket')
+          break
+        default:
+          break
+      }
+    }
+  },
+  mounted() {
+    // 初始化断点
+    if (window.innerWidth <= 600) {
+      this.collapsed.nowView = true
+      this.collapsed.viewType = 'small'
+    }
+    window.addEventListener('resize', this.checkAutoCollapse);
 
-
-    /***************************************************************
-     * 事件函数集合 onevent
-     ***************************************************************/
-
-
-
-    /***************************************************************
-     * 其他函数集合 other
-     ***************************************************************/
+    // 默认跳到聊天页（原来 mounted 里的逻辑）
     this.$router.push('/chat');
+
+    // 初始化下拉列表选项
+    (async function() {
+      const res = await request({
+        url: '/api/historicalFigures/models/random',
+        method: 'GET',
+      })
+      this.modelDropdownItems_set(res.data.map(item => ({
+        value: item.id,
+        label: item.name,
+        prompt: item.prompt,
+      })));
+    }).call(this);
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.checkAutoCollapse)
   },
 }
 </script>
 
 <style>
+/* ===== 迁移过来的样式 ===== */
+#app {
+  display: flex;
+  position: relative;
+  height: 100vh;
+}
+.sidebar-mask {
+  height: 100%;
+}
+.sidebar {
+  width: 220px;
+  min-width: 0;
+  height: 100%;
+  transition: width 0.2s;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  color: #2d3a4b;
+  background: #f5f6fa;
+}
+.sidebar.collapsed {
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  border: none;
+}
+.main-content {
+  height: calc(100% - 10px);
+  flex: 1;
+  padding: 10px 10px 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.top-content {
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
+  flex-shrink: 0; /* 防止top-content被压缩 */
+}
+.container {
+  flex: 1;
+}
+.toggle-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  padding: 10px;
+  cursor: pointer;
+  text-align: right;
+}
+.toggle-btn.main-btn {
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+}
+/* 小屏遮罩 */
+@media (max-width: 600px) {
+  .sidebar-mask {
+    position: absolute;
+    z-index: 20;
+  }
+  .sidebar-mask.full-screen {
+    width: 100%;
+    background-color: #f5f5f580;
+  }
+}
+
+/* 原来 App.vue 的变量继续保留 */
 :root {
-  --color-blue-7: rgb(51, 126, 204);
-  --color-blue-6: #409EFF;
-  --color-blue-5: rgb(121, 187, 255);
-  --color-blue-4: rgb(160, 207, 255);
-  --color-blue-3: rgb(198, 226, 255);
-  --color-blue-2: rgb(217, 236, 255);
-  --color-blue-1: rgb(236, 245, 255);
-  --color-green-1: rgb(240, 249, 235);
-  --color-green-2: rgb(225, 243, 216);
-  --color-green-3: rgb(209, 237, 196);
-  --color-green-4: rgb(179, 225, 157);
-  --color-green-5: rgb(149, 212, 117);
-  --color-green-6: #67C23A;
-  --color-green-7: rgb(82, 155, 46);
-  --color-orange-1: rgb(253, 246, 236);
-  --color-orange-2: rgb(250, 236, 216);
-  --color-orange-3: rgb(248, 227, 197);
-  --color-orange-4: rgb(243, 209, 158);
-  --color-orange-5: rgb(238, 190, 119);
-  --color-orange-6: #E6A23C;
-  --color-orange-7: rgb(184, 130, 48);
-  --color-red-1: rgb(254, 240, 240);
-  --color-red-2: rgb(253, 226, 226);
-  --color-red-3: rgb(252, 211, 211);
-  --color-red-4: rgb(250, 182, 182);
-  --color-red-5: rgb(248, 152, 152);
-  --color-red-6: #F56C6C;
-  --color-red-7: rgb(196, 86, 86);
-  --color-gray-1: rgb(244, 244, 245);
-  --color-gray-2: rgb(233, 233, 235);
-  --color-gray-3: rgb(222, 223, 224);
-  --color-gray-4: rgb(200, 201, 204);
-  --color-gray-5: rgb(177, 179, 184);
-  --color-gray-6: #909399;
-  --color-gray-7: rgb(115, 118, 122);
+  --blue-3: #003a8c;
+  --blue-2: #1890ff;
+  --blue-1: #91d5ff;
+  --blue-3-hover: #0050b3;
+  --blue-2-hover: #40a9ff;
+  --blue-1-hover: #bae7ff;
+  --blue-3-click: #002766;
+  --blue-2-click: #096dd9;
+  --blue-1-click: #69c0ff;
+  --green-3: #135200;
+  --green-2: #52c41a;
+  --green-1: #b7eb8f;
+  --green-3-hover: #0a0c09;
+  --green-2-hover: #73d13d;
+  --green-1-hover: #d9f7be;
+  --green-3-click: #092b00;
+  --green-2-click: #389e0d;
+  --green-1-click: #95de64;
+  --orange-3: #874d00;
+  --orange-2: #faad14;
+  --orange-1: #ffe58f;
+  --orange-3-hover: #ad6800;
+  --orange-2-hover: #fff1b8;
+  --orange-1-hover: #fffbe6;
+  --orange-3-click: #613400;
+  --orange-2-click: #d48806;
+  --orange-1-click: #ffd666;
+  --red-3: #8a111f;
+  --red-2: #fc4548;
+  --red-1: #ffc5bf;
+  --red-3-hover: #b01e2a;
+  --red-2-hover: #ff706e;
+  --red-1-hover: #ffebe8;
+  --red-3-click: #630b18;
+  --red-2-click: #d62f37;
+  --red-1-click: #ff9c96;
 
-  --color-blue-tp-7: rgb(51, 126, 204, 128);
-  --color-blue-tp-6: #409EFF80;
-  --color-blue-tp-5: rgb(121, 187, 255, 128);
-  --color-blue-tp-4: rgb(160, 207, 255, 128);
-  --color-blue-tp-3: rgb(198, 226, 255, 128);
-  --color-blue-tp-2: rgb(217, 236, 255, 128);
-  --color-blue-tp-1: rgb(236, 245, 255, 128);
-  --color-green-tp-1: rgb(240, 249, 235, 128);
-  --color-green-tp-2: rgb(225, 243, 216, 128);
-  --color-green-tp-3: rgb(209, 237, 196, 128);
-  --color-green-tp-4: rgb(179, 225, 157, 128);
-  --color-green-tp-5: rgb(149, 212, 117, 128);
-  --color-green-tp-6: #67C23A80;
-  --color-green-tp-7: rgb(82, 155, 46, 128);
-  --color-orange-tp-1: rgb(253, 246, 236, 128);
-  --color-orange-tp-2: rgb(250, 236, 216, 128);
-  --color-orange-tp-3: rgb(248, 227, 197, 128);
-  --color-orange-tp-4: rgb(243, 209, 158, 128);
-  --color-orange-tp-5: rgb(238, 190, 119, 128);
-  --color-orange-tp-6: #E6A23C80;
-  --color-orange-tp-7: rgb(184, 130, 48, 128);
-  --color-red-tp-1: rgb(254, 240, 240, 128);
-  --color-red-tp-2: rgb(253, 226, 226, 128);
-  --color-red-tp-3: rgb(252, 211, 211, 128);
-  --color-red-tp-4: rgb(250, 182, 182, 128);
-  --color-red-tp-5: rgb(248, 152, 152, 128);
-  --color-red-tp-6: #F56C6C80;
-  --color-red-tp-7: rgb(196, 86, 86, 128);
-  --color-gray-tp-1: rgb(244, 244, 245, 128);
-  --color-gray-tp-2: rgb(233, 233, 235, 128);
-  --color-gray-tp-3: rgb(222, 223, 224, 128);
-  --color-gray-tp-4: rgb(200, 201, 204, 128);
-  --color-gray-tp-5: rgb(177, 179, 184, 128);
-  --color-gray-tp-6: #90939980;
-  --color-gray-tp-7: rgb(115, 118, 122, 128);
+  --text-title: #000000e0;
+  --text-1: #000000e0;
+  --text-2: #000000a6;
+  --text-disable: #00000040;
 
-  --text-black: #000000;       /* 黑色文本 */
-  --text-main: #303133;        /* 主要文本 */
-  --text-normal: #606266;      /* 常规文本 */
-  --text-supplement: #909399;  /* 辅助文本 */
-  --text-placeholder: #a8abb2; /* 占位符文本 */
-  --text-disable: #c0c4cc;     /* 禁用文本 */
-  --text-7: #000000;
-  --text-6: #303133;
-  --text-5: #606266;
-  --text-4: #909399;
-  --text-3: #a8abb2;
-  --text-2: #c0c4cc;
-  --text-1: #c0c4cc;
-  --border-color-7: #000000;
-  --border-color-6: #CDD0D6;
-  --border-color-5: #D4D7DE;
-  --border-color-4: #DCDFE6;
-  --border-color-3: #E4E7ED;
-  --border-color-2: #EBEEF5;
-  --border-color-1: #F2F6FC;
-  --black: #000000;
-  --white: #FFFFFF;
-  --transparent: #ffffff00;
-}
-
-nav {
-  padding: 30px;
-}
-
-nav a {
-  font-weight: bold;
-  color: #2c3e50;
-}
-
-nav a.router-link-exact-active {
-  color: #42b983;
+  --border-color: #d9d9d9;
+  --line: #f5f5f5;
+  --bg-color: #f5f5f5;
+  --bg--color-deep: #eaeaea;
 }
 
 body {
-  padding: 0;
   margin: 0;
+  padding: 0;
 }
 </style>

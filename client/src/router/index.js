@@ -15,6 +15,11 @@ const routes = [
     name: 'chatView',
     component: () => import('../views/chatView/index.vue')
   },
+  {
+    path: '/historicalFiguresMarket',
+    name: 'HistoricalFiguresMarket',
+    component: () => import('../views/HistoricalFiguresMarket/index.vue')
+  },
 ]
 
 const router = new VueRouter({

@@ -7,7 +7,7 @@
     <div v-if="open" class="dropdown-menu">
       <div class="dropdown-title">选择人物</div>
       <div class="dropdown-divider"></div>
-      <div v-for="item in options" :key="item.value" class="dropdown-item" @click="select(item)">
+      <div v-for="item in options" :key="item.value" class="dropdown-item" @click="onSelect(item)">
         <div class="item-row">
           <span class="item-label">{{ item.label }}</span>
           <span class="item-desc">{{ item.desc }}</span>
@@ -27,10 +27,6 @@
 export default {
   name: 'ModelDropdown',
   props: {
-    value: {
-      type: String,
-      default: 'value1',
-    },
     options: {
       type: Array,
       default: () => [
@@ -39,26 +35,25 @@ export default {
         { value: 'value3', label: '不会吧不会吧，你要选选择3' },
       ],
     },
+    selected: {
+      type: Object,
+      default: () => ({ value: 'value1', label: '选择1' }),
+    }
   },
   data() {
     return {
       open: false,
-      selected: this.options.find(o => o.value === this.value) || this.options[0],
     }
   },
   watch: {
-    value(val) {
-      this.selected = this.options.find(o => o.value === val) || this.options[0];
-    }
   },
   methods: {
     toggle() {
       this.open = !this.open;
     },
-    select(item) {
-      this.selected = item;
+    onSelect(item) {
       this.open = false;
-      this.$emit('input', item.value);
+      this.$emit('select', item.value);
     }
   }
 }

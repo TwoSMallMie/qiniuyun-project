@@ -14,19 +14,17 @@ export default {
 		MultiLineInput: () => import('@/components/MultiLineInput/index.vue'),
 	},
 	props: {
-    init_title: {
-      type: String,
-      default: '早上好，中午好，下午好，晚上好'
-    }
 	},
 	data() {
     return {
-      title: ' ',
+      temp_title: (name) => `来跟${name}聊天吧！`,
+      title: '',
     }
   },
   computed: {
     ...mapState({
       chatText: state => state.chatView.chatText, //聊天文本内容
+      selectedName: state => state.chatView.selectedName, // 选中的模型名称
     })
 
 
@@ -86,23 +84,38 @@ export default {
   },
   mounted() {
     (async function() {
+      /**
+       * 生成器函数，用于按字符迭代字符串
+       * @param {string} text 要迭代的字符串
+       * @return {Generator<string, void, undefined>} 字符迭代器
+       */
       function* createTextIterator(text) {
         for (let i = 0; i < text.length; i++) {
           yield text[i];
         }
       }
 
-      const iterator = createTextIterator(this.init_title);
+      // 按字符迭代init_title，模拟打字机效果
+      const iterator = createTextIterator(this.temp_title(this.selectedName));
       let result = iterator.next();
       while (!result.done) {
-        await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * (125 - 75 + 1)) + 75));
-        this.title = this.title.concat(result.value);
-        result = iterator.next();
+        await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * (250 - 100 + 1)) + 100));
+        //可能打1-3字，随机数 1字50% 2字30% 3字20%
+        const randomNum = Math.floor(Math.random() * (100 - 1 + 1)) + 1;
+        let charNum = 1;
+        if (randomNum <= 50) charNum = 1;
+        else if (randomNum <= 80) charNum = 2;
+        else charNum = 3;
+        // 拼接字符
+        for (let i = 0; i < charNum; i++) {
+          if (result.done) {
+            break;
+          }
+          this.title = this.title.concat(result.value);
+          result = iterator.next();
+        }
       }
     }).call(this);
-    
-
-    
   },
 }
 </script>

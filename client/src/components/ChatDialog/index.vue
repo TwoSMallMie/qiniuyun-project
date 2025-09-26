@@ -76,6 +76,7 @@
 <script>
 import { marked } from 'marked';
 import copyToClipboard from '@/utils/copyToClipboard/index.js'; //这里引用了copyToClipboard函数
+import { debounce } from '@/utils/helper';
 
 
 export default {
@@ -201,15 +202,10 @@ export default {
      * @param callback 转换函数
      */
     copyToClipboard(text, callback=(a)=>a) {
-      try {
-        // 转换文本格式
-        const transformedText = callback(text);
-        // 复制到剪贴板
-        copyToClipboard(transformedText);
-      }
-      catch (error) {
-        console.error('复制到剪贴板失败:', error);
-      }
+      // 转换文本格式
+      const transformedText = callback(text);
+      // 复制到剪贴板
+      return copyToClipboard(transformedText);
     },
 
 
@@ -219,10 +215,11 @@ export default {
     /**
      * 点击语音转文本
      */
-    async onClick_textToSpeech(msg, idx, type) {
+    onClick_textToSpeech: debounce(function(msg, idx, type) {
       // this.$emit('textToSpeech', msg.content, idx, type);
       if (type === 'play') {
-        this.$emit('textToSpeech', msg.content, idx, type);
+        const text = this.mdToText(msg.content);
+        this.$emit('textToSpeech', text, idx, type);
       }
       else if (type === 'pause') {
         this.$emit('pauseSpeech', idx);
@@ -230,25 +227,30 @@ export default {
       else if (type === 'replay') {
         this.$emit('replaySpeech', idx);
       }
-    },
+    }, 256),
     
     /**
      * 点击复制
      * @param msg 要复制的消息
      */
-    async onClick_copy(msg) {
+    onClick_copy: debounce(function(msg) {
+      let isCopyToClipboard = false;
+      
       if (msg.copy) {
         if (msg.role === 'assistant') {
-          this.copyToClipboard(msg.content, this.mdToText);
+          isCopyToClipboard = this.copyToClipboard(msg.content, this.mdToText);
         }
         else if (msg.role === 'user') {
-          this.copyToClipboard(msg.content);
+          isCopyToClipboard = this.copyToClipboard(msg.content);
         }
         else {
-          this.copyToClipboard(msg.content);
+          isCopyToClipboard = this.copyToClipboard(msg.content);
         }
       }
-    },
+      console.log(isCopyToClipboard);
+      
+      alert(isCopyToClipboard ? '成功复制到粘贴板' : '复制失败，请重试');
+    }, 256),
 
     /**
      * 点击重新思考
@@ -347,16 +349,29 @@ export default {
   padding: 0px 12px;
   border-radius: 12px;
   font-size: 12px;
-  background: #f5f7fa;
+  background: var(--bg-color);
   color: #222;
   word-break: break-word;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 .chat-row.user .chat-bubble,
 .chat-row.error .chat-bubble {
-  background: #2563eb;
+  background: var(--blue-2);
   color: #fff;
   margin-left: auto;
+}
+.chat-bubble table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.chat-bubble th,
+.chat-bubble td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+.chat-bubble th {
+  background-color: #f2f2f2;
 }
 .error-msg {
   color: #d32f2f;
@@ -387,14 +402,24 @@ export default {
   display: inline-block;
 }
 .chat-divider {
-  height: 18px;
-  margin: 8px 12px 0px 12px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  height: 28px;
+  margin: 0px 12px;
+  
 }
 .chat-divider-svg {
   width: 18px;
   height: 18px;
-  margin: 0 8px;
+  margin: 8px 4px 0px 4px;
+  padding: 4px;
+  border-radius: 4px;
   cursor: pointer;
+  transition: background-color 0.2s;
+}
+.chat-divider-svg:hover {
+  background-color: var(--bg-color);
 }
 /* 隐藏所有滚动条（适用于现代浏览器） */
 .hide_scrolling {
@@ -412,6 +437,7 @@ export default {
 
 /* 添加旋转动画类 */
 .rotating {
+  background-color: none !important;
   animation: spin 1s linear infinite;
 }
 </style>
