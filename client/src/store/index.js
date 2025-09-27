@@ -9,12 +9,11 @@ export default new Vuex.Store({
   state: {
     /**下拉列表选项*/
     modelDropdownItems: [
-      { value: 0, label: '路人甲' },
-      { value: 1, label: '炮灰乙' },
+      { value: 0, label: '请选择' },
     ],
 
     /**下拉菜单选中项*/
-    selectedModel: null,
+    selectedModel: { value: 0, label: '请选择' },
   },
   getters: {
   },

@@ -37,7 +37,7 @@
         <sideBarNav
           v-if="!collapsed.nowView"
           :value="sideBarNavItems"
-          @select="onSelect"
+          @select="onSelect_nav"
         />
       </div>
     </div>
@@ -167,15 +167,18 @@ export default {
      * 点击导航项时触发
      * @param {number} index 索引
      */
-    onSelect(value) {
+    onSelect_nav(value) {
+      // 获取当前的路由路径
+      const currentPath = this.$router.currentRoute.path.slice(1);
+
       switch(value) {
         case 'chat':
           // 点击新聊天，跳转到聊天页
-          if (this.activeValue !== 'chat') this.$router.push('/chat')
+          if (value !== currentPath) this.$router.push('/chat')
           break
         case 'historicalFiguresMarket':
           // 点击选择历史人物，跳转到历史人物市场页
-          if (this.activeValue !== 'historicalFiguresMarket') this.$router.push('/historicalFiguresMarket')
+          if (value !== currentPath) this.$router.push('/historicalFiguresMarket')
           break
         default:
           break
@@ -202,8 +205,9 @@ export default {
       this.modelDropdownItems_set(res.data.map(item => ({
         value: item.id,
         label: item.name,
-        prompt: item.prompt,
-        figureId: item.figureId,
+        prompt: JSON.parse(item.prompt),
+        figureId: item.figure_id,
+        figureName: item.figure_name,
       })));
     }).call(this);
   },

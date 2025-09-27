@@ -73,7 +73,7 @@ export default {
       chatText: state => state.chatView.chatText, // 用户输入的聊天文本内容
       chatResult: state => state.chatView.chatResult, // 聊天结果
       audioMap: state => state.chatView.audioMap, // 音频列表
-      promptText: state => state.chatView.promptText, // 提示文本
+      selectedModel: state => state.selectedModel, // 选中的模型
     }),
 
     /**
@@ -151,16 +151,6 @@ export default {
      * @param isReChat 是否属于重新聊天
      */
     async QiniuChat(isReChat=false) {
-      // 若是重新聊天,不需提交文本框内容
-      if (!isReChat) {
-        this.chatResult_push(createChatResult('user', this.chatText, {copy:true}));
-        this.chatText_set('');
-      }
-      
-      this.isChat = true; // 标记为正在聊天
-      this.chatResult_push(createChatResult('assistant', '', {thinking: true})); // 记录助手信息，初始时助手在思考
-      const index = this.chatResult.length - 1;
-      
       /**
        * 发送请求
        * @returns {Promise<Response>} 响应对象
@@ -169,13 +159,23 @@ export default {
         this.chatAbortController = new AbortController(); // 创建取消控制器
         let response; // 保存响应对象
 
+        const systemPrompt = [{
+          "role": "system",
+          "content": [{
+            type: 'text',
+            text: '这是一个利用 AI 来做角色扮演的网页，你将扮演一个角色与用户进行沟通，其常用词，思维方式，情绪，社会经验，及要求如下：',
+          }]
+          .concat(Object.keys(this.selectedModel.prompt).map(key=>({
+            type: 'text',
+            text: Array.isArray(this.selectedModel.prompt[key]) ? this.selectedModel.prompt[key].join(';') : this.selectedModel.prompt[key],
+          })))
+        }]
+
         // 设置请求体
         const requestBody = {
           search: this.isSearch,
-          messages: [{
-            "role": "user",
-            "content": this.promptText
-          }].concat(this.chatResult.slice(0, -1).map(item=>({
+          messages: systemPrompt
+          .concat(this.chatResult.slice(0, -1).map(item=>({
             "role": item.role,
             "content": item.content
           })))
@@ -213,8 +213,9 @@ export default {
        * 处理流式响应数据
        * @param response 响应对象
        * @param index 聊天结果索引
+       * @param callback 每次进行一次处理的回调函数
        */
-      async function processStreamData(response, index) {
+      async function processStreamData(response, index, callback=null) {
         const reader = response.body.getReader(); // 获取流式读取器
         this.chatReader = reader; // 保存读取器以便后续可能的取消
         const decoder = new TextDecoder(); // 文本解码器
@@ -262,8 +263,23 @@ export default {
               }]);
             }
           }
+
+          if (callback) {
+            callback();
+          }
         }
       }
+
+      // 若非重新聊天,需提交文本框内容
+      if (!isReChat) {
+        this.chatResult_push(createChatResult('user', this.chatText, {copy:true}));
+        this.chatText_set('');
+      }
+      
+      // 开始聊天，记录助手信息，设置助手的思考状态
+      this.isChat = true;
+      this.chatResult_push(createChatResult('assistant', '', {thinking: true}));
+      const index = this.chatResult.length - 1;
       
       let response = await toRequest.call(this); //获取请求的response
 
@@ -281,7 +297,7 @@ export default {
 
       try {
         // 读取文字
-        await processStreamData.call(this, response, index);
+        await processStreamData.call(this, response, index, ()=>this.ChatDialogToBottom());
 
         // 读取完成,添加audio,允许copy,和重新加载
         this.chatResult_setByIndex([index, {
@@ -393,7 +409,7 @@ export default {
       }
 
       // 进行请求，并检查responce，responce为null，表示请求失败，不必后续进程
-      const response = await requestTextToSpeech(text, 'qiniu_zh_female_tmjxxy');
+      const response = await requestTextToSpeech(text, 'qiniu_zh_male_tcsnsf');
       
       if (!response) {
         return null;
@@ -612,7 +628,9 @@ export default {
       // 未在聊天在则开始聊天
       else {
         this.QiniuChat();
-        this.ChatDialogToBottom();
+        this.$nextTick(() => {
+          this.ChatDialogToBottom();
+        });
       }
     },
     

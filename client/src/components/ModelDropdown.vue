@@ -1,7 +1,7 @@
 <template>
   <div class="dropdown">
     <div class="dropdown-header" @click="toggle">
-      {{ selected.label }}
+      {{ selectedComputed.label }}
       <span class="arrow" :class="{ open: open }">▼</span>
     </div>
     <div v-if="open" class="dropdown-menu">
@@ -11,7 +11,7 @@
         <div class="item-row">
           <span class="item-label">{{ item.label }}</span>
           <span class="item-desc"></span>
-          <span v-if="selected.value === item.value" class="item-check">
+          <span v-if="selectedComputed.value === item.value" class="item-check">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" stroke="#165DFF" stroke-width="2"/><circle cx="9" cy="9" r="5" fill="#165DFF"/></svg>
           </span>
           <span v-else class="item-check">
@@ -29,15 +29,11 @@ export default {
   props: {
     options: {
       type: Array,
-      default: () => [
-        { value: 'value1', label: '选择1' },
-        { value: 'value2', label: '选择2' },
-        { value: 'value3', label: '不会吧不会吧，你要选选择3' },
-      ],
+      default: () => [],
     },
     selected: {
       type: Object,
-      default: () => ({ value: 'value1', label: '选择1' }),
+      default: () => ({ value: null, label: '' }),
     }
   },
   data() {
@@ -45,7 +41,15 @@ export default {
       open: false,
     }
   },
-  watch: {
+  computed: {
+    selectedComputed() {
+      if (this.selected && this.selected.label) {
+        return this.selected
+      }
+      else {
+        return {label: '请选择', value: null}
+      }
+    }
   },
   methods: {
     toggle() {

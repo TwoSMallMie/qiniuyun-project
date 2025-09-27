@@ -109,8 +109,9 @@ export default {
       this.modelDropdownItems_set(res.map(item => ({
         value: item.id,
         label: item.name,
-        prompt: item.prompt,
-        figureId: item.figureId,
+        prompt: JSON.parse(item.prompt),
+        figureId: item.figure_id,
+        figureName: item.figure_name,
       })));
     }
   },
@@ -147,7 +148,7 @@ export default {
 
 .figures-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(3, minmax(280px, 1fr));
   gap: 16px;
   padding: 0 20px;
   overflow: auto;
@@ -156,14 +157,14 @@ export default {
 /* 基于容器查询的响应式布局 */
 @container (max-width: 1200px) {
   .figures-container {
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(2, minmax(250px, 1fr));
     gap: 18px;
   }
 }
 
 @container (max-width: 900px) {
   .figures-container {
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(1, minmax(220px, 1fr));
     gap: 15px;
   }
 }

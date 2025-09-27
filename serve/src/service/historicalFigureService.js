@@ -144,7 +144,7 @@ class HistoricalFigureModelService {
    */
   static async getAllModels() {
     console.log('获取所有模型');
-    const sql = 'SELECT id, figure_id, name, model_type, is_active, prompt FROM historical_figure_models ORDER BY id';
+    const sql = 'SELECT id, figure_id, figure_name, name, model_type, is_active, prompt FROM historical_figure_models ORDER BY id';
     return await query(sql);
   }
 
@@ -155,7 +155,7 @@ class HistoricalFigureModelService {
    */
   static async getModelById(id) {
     console.log('根据ID获取模型:', id);
-    const sql = 'SELECT id, figure_id, name, model_type, is_active, prompt FROM historical_figure_models WHERE id = ?';
+    const sql = 'SELECT id, figure_id, figure_name, name, model_type, is_active, prompt FROM historical_figure_models WHERE id = ?';
     const results = await query(sql, [id]);
     return results[0] || null;
   }
@@ -167,7 +167,7 @@ class HistoricalFigureModelService {
    */
   static async getModelsByFigureId(figureId) {
     console.log('根据历史人物ID获取模型:', figureId);
-    const sql = 'SELECT id, figure_id, name, model_type, is_active, prompt FROM historical_figure_models WHERE figure_id = ? ORDER BY id';
+    const sql = 'SELECT id, figure_id, figure_name, name, model_type, is_active, prompt FROM historical_figure_models WHERE figure_id = ? ORDER BY id';
     return await query(sql, [figureId]);
   }
   
@@ -196,13 +196,14 @@ class HistoricalFigureModelService {
    */
   static async createModel(model) {
     console.log('创建历史人物模型:', model);
-    const { figure_id, name, prompt, model_type, description, is_active } = model;
+    // 创建人物模型前，需确保人物存在
+    const { figure_id, figure_name, name, prompt, model_type, description, is_active } = model;
     const sql = `
       INSERT INTO historical_figure_models 
-      (figure_id, name, prompt, model_type, description, is_active) 
-      VALUES (?, ?, ?, ?, ?, ?)
+      (figure_id, figure_name, name, prompt, model_type, description, is_active) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
-    const result = await query(sql, [figure_id, name, prompt, model_type, description, is_active || true]);
+    const result = await query(sql, [figure_id, figure_name, name, prompt, model_type, description, is_active || true]);
     return { id: result.insertId, ...model };
   }
 
@@ -265,6 +266,7 @@ class HistoricalFigureModelService {
         hf.profession,
         hf.achievements,
         hfm.id as model_id,
+        hfm.figure_name as model_figure_name,
         hfm.name as model_name,
         hfm.prompt,
         hfm.model_type,
@@ -284,7 +286,7 @@ class HistoricalFigureModelService {
    */
   static async getModelsByType(modelType) {
     console.log('根据模型类型获取模型:', modelType);
-    const sql = 'SELECT * FROM historical_figure_models WHERE model_type = ? ORDER BY id';
+    const sql = 'SELECT id, figure_id, figure_name, name, model_type, is_active, prompt, description FROM historical_figure_models WHERE model_type = ? ORDER BY id';
     return await query(sql, [modelType]);
   }
 
@@ -299,6 +301,31 @@ class HistoricalFigureModelService {
     const sql = 'UPDATE historical_figure_models SET is_active = ? WHERE id = ?';
     await query(sql, [isActive, id]);
     return await this.getModelById(id);
+  }
+
+  /**
+   * 同步历史人物名称到模型表
+   * @param {number} figureId 历史人物ID
+   * @param {string} figureName 历史人物名称
+   * @returns {Promise<Object>} 同步结果
+   */
+  static async syncFigureNameToModels(figureId, figureName) {
+    console.log('同步历史人物名称到模型表:', figureId, figureName);
+    
+    if (!figureId || !figureName) {
+      throw new Error('历史人物ID和名称不能为空');
+    }
+    
+    const sql = 'UPDATE historical_figure_models SET figure_name = ? WHERE figure_id = ?';
+    const result = await query(sql, [figureName, figureId]);
+    
+    console.log(`同步完成，影响了 ${result.affectedRows} 条记录`);
+    return {
+      figureId,
+      figureName,
+      affectedRows: result.affectedRows,
+      message: `成功更新了 ${result.affectedRows} 个模型的figure_name字段`
+    };
   }
 }
 
