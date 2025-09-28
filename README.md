@@ -25,6 +25,7 @@ cd qiniuyun-project
 ```
 2. **数据库配置**
 ```bash
+mysql运行版本：8.0.31 
 运行数据库初始化脚本：serve\src\sql\init_database.sql
 ```
 
