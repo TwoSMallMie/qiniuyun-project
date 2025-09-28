@@ -208,12 +208,15 @@ export default {
         url: '/api/historicalFigures/models/random',
         method: 'GET',
       })
+      console.log(res);
+      
       this.modelDropdownItems_set(res.data.map(item => ({
         value: item.id,
         label: item.name,
         prompt: JSON.parse(item.prompt),
         figureId: item.figure_id,
         figureName: item.figure_name,
+        voiceType: item.voice_type,
       })));
     }).call(this);
   },

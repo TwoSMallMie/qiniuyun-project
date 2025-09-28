@@ -343,9 +343,10 @@ export default {
     /**
      * 文本转语音
      * @param text 要转换的文本
+     * @param voiceType 音色类型
      * @returns {Audio | null} 音频对象 null表示转换失败
      */
-    async QiniuTextToSpeech(text) {
+    async QiniuTextToSpeech(text, voiceType='qiniu_zh_male_ljfdxz') {
       /**
        * 文本转语音
        * @param text 文本内容
@@ -430,7 +431,7 @@ export default {
       }
 
       // 进行请求，并检查responce，responce为null，表示请求失败，不必后续进程
-      const response = await requestTextToSpeech(text, 'qiniu_zh_male_wncwxz');
+      const response = await requestTextToSpeech(text, voiceType);
       
       if (!response) {
         return null;
@@ -622,7 +623,7 @@ export default {
 
       // 转为文本转语音
       const cleanText = text.replace(/\([^)]*\)|（[^）]*）/g, ''); // 删除文本里的括号及其内容包括中文的括号
-      const audio = await this.QiniuTextToSpeech(cleanText);
+      const audio = await this.QiniuTextToSpeech(cleanText, this.chatResult[idx].voiceType);
 
       if (!audio) {
         // 转换失败,设置为play

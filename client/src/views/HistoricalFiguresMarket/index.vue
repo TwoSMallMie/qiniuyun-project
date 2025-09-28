@@ -156,6 +156,7 @@ export default {
         prompt: JSON.parse(item.prompt),
         figureId: item.figure_id,
         figureName: item.figure_name,
+        voiceType: item.voice_type,
       })));
     },
 
@@ -192,6 +193,7 @@ export default {
         prompt: JSON.parse(item.prompt),
         figureId: item.figure_id,
         figureName: item.figure_name,
+        voiceType: item.voice_type,
       })));
       this.selectedModel_set({
         value: model.id,
@@ -199,6 +201,7 @@ export default {
         prompt: JSON.parse(model.prompt),
         figureId: model.figure_id,
         figureName: model.figure_name,
+        voiceType: model.voice_type,
       });
 
       // 跳转至聊天界面
