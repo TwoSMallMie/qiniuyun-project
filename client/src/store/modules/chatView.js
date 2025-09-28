@@ -3,7 +3,7 @@ export default {
   namespaced: true,
   state: {
     /**聊天文本内容*/
-    chatText: '你对酒是什么情感？',
+    chatText: '',
     // chatText: '',
 
     /**聊天结果*/
