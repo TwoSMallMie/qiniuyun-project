@@ -24,7 +24,7 @@ export default {
   computed: {
     ...mapState({
       chatText: state => state.chatView.chatText, //聊天文本内容
-      selectedName: state => state.selectedModel.figureName || state.selectedModel.label, // 选中的模型名称
+      selectedName: state => state.selectedModel.label, // 选中的模型名称
     })
   },
   watch: {

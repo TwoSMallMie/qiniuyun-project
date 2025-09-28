@@ -41,6 +41,11 @@ router.get('/figures/search', HistoricalFigureController.searchFigures);
 // 获取历史人物及其模型（关联数据）
 router.get('/figures-with-models', HistoricalFigureController.getFiguresWithModels);
 
+// 根据历史人物id获取其图片，base64编码
+router.get('/figures/image/:id', HistoricalFigureController.getFigureImageById);
+
+
+
 /**
  * 历史人物模型相关路由
  */

@@ -4,8 +4,14 @@
   <div class="chat-container hide_scrolling">
     <div v-for="(msg, idx) in messages" :key="idx" class="chat-row" :class="msg.role === 'user' ? 'user' : (msg.role === 'assistant' ? 'assistant' : 'error')">
       <!-- 图标 -->
-      <div v-if="msg.role === 'assistant'" class="avatar left-avatar">🤖</div>
-      <div v-else-if="msg.role === 'user'" class="avatar right-avatar">🧑</div>
+      <div v-if="msg.role === 'assistant'" class="avatar left-avatar">
+        <img v-if="imgs.assistant" :src="imgs.assistant" alt="" width="36px">
+        <span v-else>🤖</span>
+      </div>
+      <div v-else-if="msg.role === 'user'" class="avatar right-avatar">
+        <img v-if="imgs.user" :src="imgs.user" alt="" width="36px">
+        <span v-else>🧑</span>
+      </div>
 
       <!-- 文本框和其他 -->
       <div class="chat-content-wrapper">
@@ -13,7 +19,7 @@
           <span class="loader"></span>
         </div>
         <div v-if="!msg.thinking" class="chat-bubble" v-html="msg.role !== 'user' ? renderContent_assistant(msg.content) : renderContent_user(msg.content)"></div>
-        <div v-if="msg.modernContent !== ''" style="max-width:calc(80%);">
+        <div v-if="msg.modernContent !== ''">
           <br />
           <div style="font-size:14px;">翻译结果：</div>
           <div v-if="!msg.thinking" class="chat-modern" v-html="msg.role !== 'user' ? renderContent_assistant(msg.modernContent) : renderContent_user(msg.content)"></div>
@@ -114,6 +120,11 @@ export default {
     messages: {
       type: Array,
       required: true
+    },
+    /**图片映射表*/ //assistant代表助手的头像 user代表用户的头像
+    imgs: {
+      type: Object,
+      default: () => ({})
     }
   },
   data() {
@@ -347,7 +358,9 @@ export default {
   padding: 16px 0;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
+  background: linear-gradient(135deg, rgba(245, 245, 245, 0.6) 0%, rgba(245, 245, 245, 0.4) 100%);
+  backdrop-filter: blur(10px);
 }
 .chat-row {
   display: flex;
@@ -376,12 +389,13 @@ export default {
   justify-content: center;
   font-size: 22px;
   transform: translate(0px, -16px);
+  overflow: hidden;
 }
 .left-avatar {
-  background: #e3eafc;
+  background: linear-gradient(135deg, rgba(227, 234, 252, 0.9) 0%, rgba(227, 234, 252, 0.7) 100%);
 }
 .right-avatar {
-  background: #cbe7ff;
+  background: linear-gradient(135deg, rgba(203, 231, 255, 0.9) 0%, rgba(203, 231, 255, 0.7) 100%);
 }
 .chat-content-wrapper {
   width: 100%;
@@ -398,17 +412,30 @@ export default {
   padding: 0px 12px;
   border-radius: 12px;
   font-size: 12px;
-  background: var(--bg-color);
-  color: #222;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
+  color: #2c3e50;
   word-break: break-word;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   line-height: 1.5;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 }
+
 .chat-row.user .chat-bubble,
 .chat-row.error .chat-bubble {
-  background: var(--blue-2);
+  background: linear-gradient(135deg, rgba(24, 144, 255, 0.9) 0%, rgba(24, 144, 255, 0.7) 100%);
   color: #fff;
   margin-left: auto;
+  border: 1px solid rgba(24, 144, 255, 0.3);
+  box-shadow: 0 4px 8px rgba(24, 144, 255, 0.2);
+}
+
+.chat-row.user .chat-bubble::before,
+.chat-row.error .chat-bubble::before {
+  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.15) 50%, transparent 70%);
 }
 .chat-bubble table {
   width: 100%;
@@ -426,21 +453,28 @@ export default {
 .error-msg {
   color: #d32f2f;
   font-size: 15px;
-  padding: 10px 18px;
+  padding: 10px 16px;
   border-radius: 8px;
-  background: #fff3f3;
+  background: linear-gradient(135deg, rgba(255, 243, 243, 0.9) 0%, rgba(255, 243, 243, 0.7) 100%);
   margin: 0 8px;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(211, 47, 47, 0.2);
+  box-shadow: 0 2px 8px rgba(211, 47, 47, 0.1);
 }
 .loading-bubble {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f7fa;
+  background: linear-gradient(135deg, rgba(245, 247, 250, 0.9) 0%, rgba(245, 247, 250, 0.7) 100%);
   min-height: 38px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
 }
 .chat-row.user .loading-bubble,
 .chat-row.error .loading-bubble {
-  background: #2563eb;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.9) 0%, rgba(37, 99, 235, 0.7) 100%);
+  border: 1px solid rgba(37, 99, 235, 0.3);
 }
 .loader {
   width: 24px;
@@ -469,13 +503,12 @@ export default {
   transition: background-color 0.2s;
 }
 .chat-divider-svg:hover {
-  background-color: var(--bg-color);
+  background: rgba(24, 144, 255, 0.15);
 }
 .chat-modern {
   padding: 0px 12px;
   font-size: 12px;
-  color: #222;
-  word-break: break-word;
+  color: #2c3e50;
 }
 .div-icon {
   margin: 8px 4px 0px 4px;
@@ -488,7 +521,7 @@ export default {
   font-weight: bold;
 }
 .div-icon:hover {
-  background-color: var(--bg-color);
+  background: rgba(24, 144, 255, 0.15);
 }
 .div-icon>div {
   width: 18px;

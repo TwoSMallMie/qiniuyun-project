@@ -1,4 +1,6 @@
 const { query } = require('../db');
+const fs = require('fs');
+const path = require('path');
 
 // 历史人物服务类
 class HistoricalFigureService {
@@ -133,6 +135,56 @@ class HistoricalFigureService {
     `;
     const searchPattern = `%${keyword}%`;
     return await query(sql, [searchPattern, searchPattern, searchPattern, searchPattern]);
+  }
+
+  
+  /**
+   * 根据图片路径获取图片的 base64 编码，使用 Node.js 的 fs 模块读取本地文件
+   * @param {string} imgPath 图片路径
+   * @returns {Promise<string>} 图片的 base64 编码
+   * @private
+   */
+  static _getImageBase64(imgPath) {
+    return new Promise((resolve, reject) => {
+      // 拼接完整路径，假设图片存放在项目的 static/images 目录下
+      // 注意：imgPath已经包含了相对于static/images的路径，不需要再拼接
+      const fullPath = path.join(__dirname, '../../', imgPath);
+      console.log('尝试读取图片路径:', fullPath);
+      
+      fs.readFile(fullPath, (err, data) => {
+        if (err) {
+          console.error('读取图片失败:', err);
+          reject(new Error('获取图片base64编码失败'));
+        } else {
+          console.log('图片读取成功，大小:', data.length, '字节');
+          
+          const base64 = data.toString('base64');
+          resolve(`data:image/jpeg;base64,${base64}`);
+        }
+      });
+    });
+  }
+
+  /**
+   * 根据历史人物ID获取其图片，base64编码
+   * @param {number} id 历史人物ID
+   * @returns {Promise<string>} 图片base64编码
+   */
+  static async getFigureImageById(id) {
+    console.log('根据历史人物ID获取其图片，base64编码:', id);
+    const sql = 'SELECT img_url FROM historical_figures WHERE id = ?';
+    const result = await query(sql, [id]);
+    
+    if (result.length === 0) {
+      throw new Error('历史人物不存在或没有图片');
+    }
+    
+    const img_url = result[0].img_url;
+
+    // 从本地获取图片base64编码
+    const imageBase64 = await this._getImageBase64(img_url);
+  
+    return imageBase64;
   }
 }
 

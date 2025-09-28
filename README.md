@@ -23,12 +23,16 @@ git clone <项目地址>
 cd qiniuyun-project
 
 ```
+2. **数据库配置**
+```bash
+运行数据库初始化脚本：serve\src\sql\init_database.sql
+```
+
 2. **启动后端服务**
 ```bash
 cd serve
 npm install
-npm start
-
+node index.js
 ```
 3. **启动前端服务** (新开终端)
 ```bash

@@ -4,6 +4,7 @@
     <ChatDialog
       ref="ChatDialog"
       :messages="chatResult"
+      :imgs="imgs"
       @textToSpeech="onTextToSpeech_do"
       @pauseSpeech="onPauseSpeech_pause"
       @replaySpeech="onReplaySpeech_replay"
@@ -75,6 +76,9 @@ export default {
 
       /**浏览器大小变化监听器*/
       browserSizeListener: null,
+
+
+      imgs: {},
     }
   },
   computed: {
@@ -83,6 +87,7 @@ export default {
       chatResult: state => state.chatView.chatResult, // 聊天结果
       audioMap: state => state.chatView.audioMap, // 音频列表
       selectedModel: state => state.selectedModel, // 选中的模型
+      imgMap: state => state.imgMap, // 图片映射表
     }),
 
     /**
@@ -108,7 +113,7 @@ export default {
       audioMap_deleteByIndex: 'chatView/audioMap_deleteByIndex',
       audioMap_getByIndex: 'chatView/audioMap_getByIndex',
       audioMap_clear: 'chatView/audioMap_clear',
-
+      imgMap_set: 'imgMap_set',
     }),
     /***************************************************************
      * 外部调用函数集合 func
@@ -126,7 +131,30 @@ export default {
     /***************************************************************
      * 工具函数集合 helper
      ***************************************************************/
-
+    /**
+     * 转换图片base64编码为png格式并保存
+     * @param {String} img_base64 - 图片base64编码
+     * @returns {String} 转换后的png图片base64编码
+     */
+    Imgbase64ToPng(img_base64) {
+      try {
+        const base64 = img_base64.split(',')[1];
+        const png = atob(base64);
+        const arrayBuffer = new ArrayBuffer(png.length);
+        const uint8Array = new Uint8Array(arrayBuffer);
+        for (let i = 0; i < png.length; i++) {
+          uint8Array[i] = png.charCodeAt(i);
+        }
+        const blob = new Blob([arrayBuffer], { type: 'image/png' });
+        const url = URL.createObjectURL(blob);
+        
+        return url;
+      }
+      catch(e) {
+        console.error('保存图片到本地失败:', e);
+        return '';
+      }
+    },
 
      
     /***************************************************************
@@ -628,6 +656,11 @@ export default {
       if (!audio) {
         // 转换失败,设置为play
         this.chatResult_setAudioByIndex([idx, 'play']);
+        Message({
+          showClose: true,
+          message: '文本转语音失败，请重试',
+          type: 'error'
+        });
         return;
       }
 
@@ -912,6 +945,36 @@ export default {
     this.init_scroll_listener();
     this.init_content_observer();
     this.init_browser_size_listener();
+
+    // 若当前选中项对应的历史人物没有图片
+    // 则加载图片
+    if (this.imgMap.has(this.selectedModel.figureId)) {
+      const img = this.imgMap.get(this.selectedModel.figureId);
+      this.imgs = {
+        assistant: img,
+      }
+    }
+    else {
+      request({
+        url: `/api/historicalFigures/figures/image/${this.selectedModel.figureId}`,
+        method: 'GET',
+      })
+      .then(res => {
+        return res.data.image_base64;
+      })
+      .then(base64 => {
+        // 转换为png格式并保存
+        const pngBase64 = this.Imgbase64ToPng(base64);
+        // 保存到vuex状态管理
+        this.imgMap_set([this.selectedModel.figureId, pngBase64]);
+        this.imgs = {
+          assistant: pngBase64,
+        }
+      })
+      .catch(err => {
+        console.error('获取图片失败:', err);
+      })
+    }
   },
   beforeDestroy() {
     // 组件销毁时，清理相关的监听

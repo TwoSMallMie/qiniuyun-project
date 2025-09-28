@@ -2,7 +2,7 @@
   <div class="dropdown">
     <div class="dropdown-header" @click="toggle">
       {{ selectedComputed.label }}
-      <span class="arrow" :class="{ open: open }">▼</span>
+      <!-- <span class="arrow" :class="{ open: open }">▼</span> -->
     </div>
     <div v-if="open" class="dropdown-menu">
       <div class="dropdown-title">选择人物</div>
@@ -53,7 +53,8 @@ export default {
   },
   methods: {
     toggle() {
-      this.open = !this.open;
+      return;
+      // this.open = !this.open;
     },
     onSelect(item) {
       this.open = false;

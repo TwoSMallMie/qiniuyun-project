@@ -94,7 +94,7 @@ export default {
   max-width: 700px;
   width: calc(100% - 48px);
   position: absolute;
-  top: calc(50% + 20px);
+  top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
 }
@@ -102,6 +102,6 @@ export default {
   max-height: calc(100% - 20px - 28px - 10px);
 }
 .chat-view-center.full {
-  height: calc(100% - 20px - 28px - 10px);
+  height: calc(100% - 20px);
 }
 </style>

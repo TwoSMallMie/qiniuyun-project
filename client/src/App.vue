@@ -208,8 +208,6 @@ export default {
         url: '/api/historicalFigures/models/random',
         method: 'GET',
       })
-      console.log(res);
-      
       this.modelDropdownItems_set(res.data.map(item => ({
         value: item.id,
         label: item.name,
@@ -232,6 +230,7 @@ export default {
   display: flex;
   position: relative;
   height: 100vh;
+  background-color: var(--bg-color);
 }
 .sidebar-mask {
   height: 100%;
@@ -376,6 +375,9 @@ body {
   --line: #f5f5f5;
   --bg-color: #f5f5f5;
   --bg--color-deep: #eaeaea;
+  --bg-color-best: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(30, 58, 138, 0.7) 100%);
+  --bg-color-best-disabled: linear-gradient(135deg, rgba(128, 128, 128, 0.6) 0%, rgba(128, 128, 128, 0.4) 100%);
+  --color-best: #383b44;
 }
 </style>
 

@@ -71,7 +71,7 @@ export default {
   background-color: var(--bg--color-deep);
 }
 .sidebar-nav>div.active {
-  background-color: var(--blue-2);
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(30, 58, 138, 0.7) 100%);
   color: white;
   font-weight: 500;
 }

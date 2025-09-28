@@ -23,6 +23,9 @@ export default new Vuex.Store({
 
     /** 当前选中的导航项 */
     activeNavValue: null,
+
+    /** 人物图片映射表 */
+    imgMap: new Map(),
   },
   getters: {
   },
@@ -65,6 +68,25 @@ export default new Vuex.Store({
      */
     activeNavValue_toggle(state, value) {
       state.activeNavValue = value;
+    },
+
+    /**
+     * 设置人物图片映射表
+     * @param state 状态
+     * @param {Map} value 值
+     */
+    imgMap_set(state, [index, value]) {
+      state.imgMap.set(index, value);
+    },
+
+    /**
+     * 获取人物图片映射表
+     * @param state 状态
+     * @param {number} index 人物索引
+     * @returns {string} 人物图片base64编码
+     */
+    imgMap_get(state, index) {
+      return state.imgMap.get(index);
     },
   },
   actions: {

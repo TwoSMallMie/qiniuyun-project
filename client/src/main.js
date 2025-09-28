@@ -5,9 +5,10 @@ import store from './store'
 
 Vue.config.productionTip = false
 
-import { Button, Select } from 'element-ui';
+import { Button, Select, Switch } from 'element-ui';
 Vue.use(Button)
 Vue.use(Select)
+Vue.use(Switch)
 
 
 

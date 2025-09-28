@@ -9,7 +9,7 @@
           <div class="figure-card-content">
             <div class="figure-1">
               <div class="avatar-container">
-                <img :src="figure.avatar || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiByeD0iNTAiIGZpbGw9IiNmMGYwZjAiLz4KPHN2ZyB4PSIyNSIgeT0iMjUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMCAxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnptMCAzYy0xLjY2IDAtMyAxLjM0LTMgM3MxLjM0IDMgMyAzIDMtMS4zNCAzLTMtMS4zNC0zLTMtM3ptMCA1YzIuMjEgMCA0IDEuNzkgNCA0djFIOHYtMWMwLTIuMjEgMS43OS00IDQtNHoiIGZpbGw9IiM5OTkiLz4KPC9zdmc+Cjwvc3ZnPgo='" :alt="figure.name" class="avatar">
+                <img :src="imgMap.get(figure.id) || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiByeD0iNTAiIGZpbGw9IiNmMGYwZjAiLz4KPHN2ZyB4PSIyNSIgeT0iMjUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMCAxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnptMCAzYy0xLjY2IDAtMyAxLjM0LTMgM3MxLjM0IDMgMyAzIDMtMS4zNCAzLTMtMS4zNC0zLTMtM3ptMCA1YzIuMjEgMCA0IDEuNzkgNCA0djFIOHYtMWMwLTIuMjEgMS43OS00IDQtNHoiIGZpbGw9IiM5OTkiLz4KPC9zdmc+Cjwvc3ZnPgo='" :alt="figure.name" class="avatar">
               </div>
             </div>
             <div class="figure-2">
@@ -18,16 +18,32 @@
             </div>
           </div>
           <div class="figure-card-overlay" v-if="hoveredFigureId === figure.id" @click.stop>
+            <div class="overlay-backdrop"></div>
             <div class="overlay-content">
+              <h4 class="overlay-title">选择模型</h4>
               <div class="model-list" v-if="historicalFiguresModelsMap.has(figure.id)">
-                选择模型
-                <div class="model-item" v-for="(model, index) in historicalFiguresModelsMap.get(figure.id)" :key="index" @click="onClick_selectModel(model)">
-                  {{ model.name }}
+                <div 
+                  class="model-item" 
+                  v-for="(model, index) in historicalFiguresModelsMap.get(figure.id)" 
+                  :key="index" 
+                  @click="onClick_selectModel(model)"
+                >
+                  <div class="model-info">
+                    <div class="model-name">{{ model.name }}</div>
+                  </div>
+                  <div class="model-arrow">→</div>
                 </div>
               </div>
-              <div class="loading-spinner" v-else>
-                <div class="spinner"></div>
-                <p class="loading-text">加载中...</p>
+              <div class="loading-container" v-else>
+                <div class="loading-spinner">
+                  <div class="spinner"></div>
+                  <div class="loading-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+                <p class="loading-text">正在加载模型数据...</p>
               </div>
             </div>
           </div>
@@ -40,7 +56,7 @@
 
 <script>
 import request from '@/utils/request/index';
-import { mapMutations } from 'vuex';
+import { mapMutations, mapState } from 'vuex';
 
 export default {
   name: 'HistoricalFiguresMarket',
@@ -51,11 +67,17 @@ export default {
       hoveredFigureId: null,
     }
   },
+  computed: {
+    ...mapState({
+      imgMap: state => state.imgMap,
+    }),
+  },
   methods: {
     ...mapMutations({
       modelDropdownItems_set: 'modelDropdownItems_set',
       selectedModel_set: 'selectedModel_set',
       activeNavValue_set: 'activeNavValue_set', // 设置当前选中的导航项
+      imgMap_set: 'imgMap_set', // 设置人物图片
     }),
     /***************************************************************
      * 外部调用函数集合 func
@@ -140,6 +162,31 @@ export default {
       return res.data || {};
     },
 
+     /**
+     * 转换图片base64编码为png格式并保存
+     * @param {String} img_base64 - 图片base64编码
+     * @returns {String} 转换后的png图片base64编码
+     */
+    Imgbase64ToPng(img_base64) {
+      try {
+        const base64 = img_base64.split(',')[1];
+        const png = atob(base64);
+        const arrayBuffer = new ArrayBuffer(png.length);
+        const uint8Array = new Uint8Array(arrayBuffer);
+        for (let i = 0; i < png.length; i++) {
+          uint8Array[i] = png.charCodeAt(i);
+        }
+        const blob = new Blob([arrayBuffer], { type: 'image/png' });
+        const url = URL.createObjectURL(blob);
+        
+        return url;
+      }
+      catch(e) {
+        console.error('保存图片到本地失败:', e);
+        return '';
+      }
+    },
+
 
     /***************************************************************
      * 事件函数集合 onevent
@@ -213,6 +260,27 @@ export default {
     this.getHistoricalFigures()
     .then(figures => {
       this.historicalFiguresList = figures;
+
+      // 添加图片
+      figures.forEach(figure => {
+        // 获取图片
+        request({
+          url: `/api/historicalFigures/figures/image/${figure.id}`,
+          method: 'GET',
+        })
+        .then(res => {
+          return res.data.image_base64;
+        })
+        .then(base64 => {
+          // 转换为png格式并保存
+          const pngBase64 = this.Imgbase64ToPng(base64);
+          // 保存到vuex状态管理
+          this.imgMap_set([figure.id, pngBase64]);
+        })
+        .catch(err => {
+          console.error('获取图片失败:', err);
+        })
+      })
     });
   },
   mounted() {
@@ -265,7 +333,7 @@ export default {
 }
 
 .figure-card {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.5);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   display: flex;
@@ -359,61 +427,101 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(5px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   z-index: 2;
   animation: fadeIn 0.3s ease;
 }
 
+.overlay-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(30, 58, 138, 0.7) 100%);
+  backdrop-filter: blur(8px);
+  
+}
+
 .overlay-content {
+  position: relative;
+  z-index: 3;
   text-align: center;
-  padding: 20px;
-  max-width: 90%;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  height: 100%;
 }
 
 .overlay-title {
   font-size: 18px;
   font-weight: bold;
-  margin-bottom: 16px;
   color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  margin: 0 0 12px 0;
 }
 
 .model-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  color: white;
 }
 
 .model-item {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 6px 8px;
-  border-radius: 6px;
-  font-size: 14px;
-  color: var(--blue-2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 2px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
 }
 
 .model-item:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateX(5px);
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.model-info {
+  flex: 1;
+  text-align: left;
+}
+
+.model-name {
+  font-weight: 500;
+}
+
+.model-arrow {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.6);
+  transition: transform 0.3s ease;
+}
+
+.model-item:hover .model-arrow {
+  transform: translateX(2px);
+  color: #fff;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
+    transform: scale(0.95);
   }
   to {
     opacity: 1;
+    transform: scale(1);
   }
 }
 
-/* 加载圈样式 */
-.loading-spinner {
+/* 加载动画样式 */
+.loading-container {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -421,21 +529,62 @@ export default {
   padding: 20px;
 }
 
+.loading-spinner {
+  position: relative;
+  margin-bottom: 16px;
+}
+
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid rgba(255, 255, 255, 0.3);
-  border-top: 4px solid #fff;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top: 3px solid #fff;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin-bottom: 12px;
+}
+
+.loading-dots {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  gap: 3px;
+}
+
+.loading-dots span {
+  width: 4px;
+  height: 4px;
+  background: #fff;
+  border-radius: 50%;
+  animation: loadingDot 1.4s infinite ease-in-out both;
+}
+
+.loading-dots span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.loading-dots span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes loadingDot {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
 }
 
 .loading-text {
   color: #fff;
   font-size: 14px;
   margin: 0;
-  opacity: 0.8;
+  opacity: 0.9;
+  font-weight: 400;
 }
 
 @keyframes spin {

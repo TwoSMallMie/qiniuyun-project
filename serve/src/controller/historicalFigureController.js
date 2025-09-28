@@ -320,6 +320,40 @@ class HistoricalFigureController {
       });
     }
   }
+
+  /**
+   * 根据历史人物ID获取其图片，base64编码
+   * @param {Object} req 请求对象
+   * @param {Object} res 响应对象
+   */
+  static async getFigureImageById(req, res) {
+    try {
+      const { id } = req.params;
+      const imageBase64 = await HistoricalFigureService.getFigureImageById(id);
+      
+      if (!imageBase64) {
+        return res.status(404).json({
+          code: 404,
+          message: '历史人物不存在或没有图片'
+        });
+      }
+      
+      res.json({
+        code: 200,
+        message: '获取成功',
+        data: {
+          image_base64: imageBase64
+        }
+      });
+    } catch (error) {
+      console.error('根据历史人物ID获取图片失败:', error);
+      res.status(500).json({
+        code: 500,
+        message: '获取失败',
+        error: error.message
+      });
+    }
+  }
 }
 
 /**

@@ -3,7 +3,7 @@
 <template>
   <form @submit.prevent="onSubmit">
     <!-- 文本框 -->
-    <div style="margin-top:8px;">
+    <div style="margin-top:4px;">
       <textarea
         v-model="inputValue"
         :placeholder="placeholder"
@@ -17,7 +17,7 @@
       </textarea>
     </div>
 
-    <div style="margin-top:8px;color:#666;font-size:14px;">当前字符数: {{ inputValue.length }}</div>
+    <div style="margin-top:4px;color:#666;font-size:14px;">当前字符数: {{ inputValue.length }}</div>
     
     <!-- 提交按钮列表 -->
     <div class="submit-list">
@@ -57,6 +57,7 @@
 
 <script>
 import { debounce } from '@/utils/helper';
+import { mapState } from 'vuex'; 
 
 // import request from '@/utils/request';
 
@@ -89,6 +90,9 @@ export default {
       /**用来按顺序存语音识别的所有片段*/
       asrBuffer: [],
 
+      /**风格选择：史实/风格 */
+      
+
       /**麦克风是否被开启*/
       microphone: false,
 
@@ -99,6 +103,12 @@ export default {
       recognition: null,
     };
   },
+  computed: {
+    /**当前选择的风格*/
+    ...mapState({
+      selectedName: state => state.selectedModel.figureName
+    }),
+  }, 
   watch: {
     value(val) {
       this.inputValue = val;
@@ -286,6 +296,18 @@ export default {
       this.initData();
     },
 
+    /**
+     * 获取选中项的显示标签
+     */
+    getSelectedLabel() {
+      if (!this.selectedName) return '';
+      if (this.selectedName === '风格') {
+        return `${this.selectedName}风`;
+      }
+      const option = this.styleOptions.find(opt => opt.value === this.selectedName);
+      return option ? option.label : this.selectedName;
+    },
+
     
 
 
@@ -298,6 +320,7 @@ export default {
      */
     onInput() {
       this.reset_inputValue(this.inputValue);
+      this.stopAsr();
     },
 
     /**
@@ -446,32 +469,37 @@ export default {
   line-height: 21px;
 }
 
+.textarea:focus {
+  border-color: #7f8fbe;
+}
+
 .submit-list {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 12px;
-  margin-top:12px;
+  margin-top: 4px;
 }
 
 .microphone {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--blue-2);
+  background: var(--bg-color-best);
   display:inline-flex;
   justify-content: center;
   align-items: center;
   transition: transform 0.2s;
 }
 .microphone:hover {
-  background: var(--blue-2-hover);
+  background-color: var(--blue-2-hover);
   cursor: pointer;
 }
 
 .submit-button {
-  background: var(--blue-1);
+  background: var(--bg-color-best-disabled);
   color:#fff;
-  padding:6px 24px;
+  padding:6px 20px;
   border:none;
   border-radius:8px;
   font-size:14px;
@@ -484,10 +512,10 @@ export default {
 }
 
 .submit-button.active {
-  background: var(--blue-2);
+  background: var(--bg-color-best);
 }
 .submit-button.active:hover {
-  background: var(--blue-2-hover);
+  background-color: var(--blue-2-hover);
   cursor: pointer;
 }
 
