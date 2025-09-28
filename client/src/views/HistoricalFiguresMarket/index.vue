@@ -2,20 +2,38 @@
   <div class="historicalFiguresMarket">
     <div class="market-header">
       <p>探索历史长河中的传奇人物</p>
-      <hr>
     </div>
     <div class="figures-container">
-      <div v-for="figure in historicalFiguresList" :key="figure.id" class="figure-card" @click="onClick_selectCard(figure.id)">
-        <div class="figure-left">
-          <div class="avatar-container">
-            <img :src="figure.avatar || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiByeD0iNTAiIGZpbGw9IiNmMGYwZjAiLz4KPHN2ZyB4PSIyNSIgeT0iMjUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMCAxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnptMCAzYy0xLjY2IDAtMyAxLjM0LTMgM3MxLjM0IDMgMyAzIDMtMS4zNCAzLTMtMS4zNC0zLTMtM3ptMCA1YzIuMjEgMCA0IDEuNzkgNCA0djFIOHYtMWMwLTIuMjEgMS43OS00IDQtNHoiIGZpbGw9IiM5OTkiLz4KPC9zdmc+Cjwvc3ZnPgo='" :alt="figure.name" class="avatar">
+      <div class="figures-items">
+        <div class="figure-card" v-for="figure in historicalFiguresList" :key="figure.id" @click="onClick_selectCard(figure.id)" @mouseenter="onMouseEnter_figureCard(figure.id)" @mouseleave="onMouseLeave_figureCard(figure.id)">
+          <div class="figure-card-content">
+            <div class="figure-1">
+              <div class="avatar-container">
+                <img :src="figure.avatar || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiByeD0iNTAiIGZpbGw9IiNmMGYwZjAiLz4KPHN2ZyB4PSIyNSIgeT0iMjUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMCAxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnptMCAzYy0xLjY2IDAtMyAxLjM0LTMgM3MxLjM0IDMgMyAzIDMtMS4zNCAzLTMtMS4zNC0zLTMtM3ptMCA1YzIuMjEgMCA0IDEuNzkgNCA0djFIOHYtMWMwLTIuMjEgMS43OS00IDQtNHoiIGZpbGw9IiM5OTkiLz4KPC9zdmc+Cjwvc3ZnPgo='" :alt="figure.name" class="avatar">
+              </div>
+            </div>
+            <div class="figure-2">
+              <h3 class="figure-name">{{ figure.name }}</h3>
+              <p class="figure-description">{{ figure.description }}</p>
+            </div>
+          </div>
+          <div class="figure-card-overlay" v-if="hoveredFigureId === figure.id" @click.stop>
+            <div class="overlay-content">
+              <div class="model-list" v-if="historicalFiguresModelsMap.has(figure.id)">
+                选择模型
+                <div class="model-item" v-for="(model, index) in historicalFiguresModelsMap.get(figure.id)" :key="index" @click="onClick_selectModel(model)">
+                  {{ model.name }}
+                </div>
+              </div>
+              <div class="loading-spinner" v-else>
+                <div class="spinner"></div>
+                <p class="loading-text">加载中...</p>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="figure-right">
-          <h3 class="figure-name">{{ figure.name }}</h3>
-          <p class="figure-description">{{ figure.description }}</p>
-        </div>
       </div>
+      
     </div>
   </div>
 </template>
@@ -28,12 +46,16 @@ export default {
   name: 'HistoricalFiguresMarket',
   data() {
     return {
-      historicalFiguresList: []
+      historicalFiguresList: [],
+      historicalFiguresModelsMap: new Map(),
+      hoveredFigureId: null,
     }
   },
   methods: {
     ...mapMutations({
-      modelDropdownItems_set: 'modelDropdownItems_set'
+      modelDropdownItems_set: 'modelDropdownItems_set',
+      selectedModel_set: 'selectedModel_set',
+      activeNavValue_set: 'activeNavValue_set', // 设置当前选中的导航项
     }),
     /***************************************************************
      * 外部调用函数集合 func
@@ -96,6 +118,28 @@ export default {
       return res.data || {};
     },
 
+    /**
+     * 获取历史人物简介
+     * @param {Number} id - 人物ID
+     * @returns {Object} 人物简介
+     */
+    async getHistoricalFiguresBrief(id) {
+      let res;
+
+      try {
+        res = await request({
+          url: `/api/historicalFigures/models/figureId/${id}`,
+          method: 'GET',
+        })
+      }
+      catch(e) {
+        console.error('获取历史人物简介失败:', e);
+        return {};
+      }
+
+      return res.data || {};
+    },
+
 
     /***************************************************************
      * 事件函数集合 onevent
@@ -113,6 +157,53 @@ export default {
         figureId: item.figure_id,
         figureName: item.figure_name,
       })));
+    },
+
+    /**
+     * 处理人物卡片鼠标移入事件
+     * @param {Number} id - 人物ID
+     */
+    async onMouseEnter_figureCard(id) {
+      // 若历史人物的模型未添加进Map，则添加
+      if (!this.historicalFiguresModelsMap.has(id)) {
+        const briefData = await this.getHistoricalFiguresBrief(id);
+        this.historicalFiguresModelsMap.set(id, briefData);
+      }
+      this.hoveredFigureId = id;
+    },
+
+    /**
+     * 处理人物卡片鼠标离开事件
+     */
+    onMouseLeave_figureCard() {
+      this.hoveredFigureId = null;
+    },
+
+    /**
+     * 处理模型项点击事件
+     * @param {Object} model - 点击的模型对象
+     */
+    onClick_selectModel(model) {
+      // console.log(this.historicalFiguresModelsMap.get(model.figure_id));
+      // 设置下拉框数据
+      this.modelDropdownItems_set(this.historicalFiguresModelsMap.get(model.figure_id).map(item => ({
+        value: item.id,
+        label: item.name,
+        prompt: JSON.parse(item.prompt),
+        figureId: item.figure_id,
+        figureName: item.figure_name,
+      })));
+      this.selectedModel_set({
+        value: model.id,
+        label: model.name,
+        prompt: JSON.parse(model.prompt),
+        figureId: model.figure_id,
+        figureName: model.figure_name,
+      });
+
+      // 跳转至聊天界面
+      this.$router.push({path: '/chat',});
+      this.activeNavValue_set('chat');
     }
   },
   created() {
@@ -147,42 +238,26 @@ export default {
 }
 
 .figures-container {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(280px, 1fr));
-  gap: 16px;
-  padding: 0 20px;
+  padding: 0 10px 20px 10px;
   overflow: auto;
 }
 
-/* 基于容器查询的响应式布局 */
-@container (max-width: 1200px) {
-  .figures-container {
-    grid-template-columns: repeat(2, minmax(250px, 1fr));
-    gap: 18px;
+.figures-items {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(200px, 330px));
+  justify-content: center;
+  gap: 16px;
+}
+
+@media (max-width: 1200px) {
+  .figures-items {
+    grid-template-columns: repeat(2, minmax(200px, 330px));
   }
 }
 
-@container (max-width: 900px) {
-  .figures-container {
-    grid-template-columns: repeat(1, minmax(220px, 1fr));
-    gap: 15px;
-  }
-}
-
-@container (max-width: 600px) {
-  .figures-container {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-  
-  .figure-card {
-    flex-direction: column;
-    text-align: center;
-    gap: 12px;
-  }
-  
-  .figure-right {
-    text-align: center;
+@media (max-width: 700px) {
+  .figures-items {
+    grid-template-columns: repeat(1, minmax(200px, 330px));
   }
 }
 
@@ -190,26 +265,29 @@ export default {
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  padding: 8px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
+  text-align: center;
   transition: all 0.3s ease;
   backdrop-filter: blur(10px);
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  height: fit-content;
 }
 
 .figure-card:hover {
   background: var(--bg-color);
 }
 
-.figure-left {
-  flex-shrink: 0;
+.figure-1 {
+  padding: 8px;
 }
 
-.figure-right {
-  flex: 1;
+.figure-2 {
   text-align: left;
+  padding: 8px;
 }
 
 .avatar-container {
@@ -221,48 +299,26 @@ export default {
   height: 80px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border: 4px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
   transition: all 0.3s ease;
-}
-
-/* 基于容器查询的响应式头像大小 */
-@container (max-width: 1200px) {
-  .avatar {
-    width: 75px;
-    height: 75px;
-  }
-}
-
-@container (max-width: 900px) {
-  .avatar {
-    width: 70px;
-    height: 70px;
-  }
-}
-
-@container (max-width: 600px) {
-  .avatar {
-    width: 60px;
-    height: 60px;
-  }
 }
 
 .figure-name {
   font-size: 18px;
   font-weight: bold;
   color: #2c3e50;
-  margin: 0 0 8px 0;
-  text-align: left;
+  margin: 0 0 12px 0;
+  text-align: center;
   letter-spacing: 0.5px;
 }
 
 .figure-description {
   font-size: 14px;
   color: #7f8c8d;
-  line-height: 1.5;
+  line-height: 1.6;
   margin: 0;
-  text-align: left;
+  text-align: center;
   font-weight: 400;
 }
 
@@ -271,6 +327,7 @@ export default {
   color: #e74c3c;
   font-weight: bold;
   text-align: center;
+  margin: 0;
 }
 
 /* 基于容器查询的响应式文字大小 */
@@ -286,44 +343,100 @@ export default {
   }
 }
 
-@container (max-width: 900px) {
-  .figure-name {
-    font-size: 16px;
+/* 遮罩层样式 */
+.figure-card-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+}
+
+.figure-card-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  animation: fadeIn 0.3s ease;
+}
+
+.overlay-content {
+  text-align: center;
+  padding: 20px;
+  max-width: 90%;
+}
+
+.overlay-title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 16px;
+  color: #fff;
+}
+
+.model-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: white;
+}
+
+.model-item {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--blue-2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.2s ease;
+}
+
+.model-item:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateX(5px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
   }
-  .figure-description {
-    font-size: 12px;
-  }
-  .figure-price {
-    font-size: 14px;
+  to {
+    opacity: 1;
   }
 }
 
-@container (max-width: 600px) {
-  .figure-name {
-    font-size: 14px;
-  }
-  .figure-description {
-    font-size: 11px;
-  }
-  .figure-price {
-    font-size: 12px;
-  }
+/* 加载圈样式 */
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
 }
 
-/* 传统媒体查询作为后备方案 */
-@media (max-width: 768px) {
-  .figures-container {
-    padding: 0 15px;
-  }
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid #fff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
 }
 
-@media (max-width: 480px) {
-  .figures-container {
-    padding: 0 10px;
-    gap: 10px;
-  }
-  .figure-card {
-    padding: 15px;
-  }
+.loading-text {
+  color: #fff;
+  font-size: 14px;
+  margin: 0;
+  opacity: 0.8;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style>

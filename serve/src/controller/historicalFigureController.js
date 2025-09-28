@@ -351,6 +351,32 @@ class HistoricalFigureModelController {
   }
 
   /**
+   * 根据模型ID获取模型
+   * @param {Object} req 请求对象
+   * @param {Object} res 响应对象
+   */
+  static async getModelById(req, res) {
+    try {
+      const { id } = req.params;
+      const model = await HistoricalFigureModelService.getModelById(id);
+      
+      res.json({
+        code: 200,
+        message: '获取成功',
+        data: model
+      });
+    } catch (error) {
+      console.error('根据模型ID获取模型失败:', error);
+      res.status(500).json({
+        code: 500,
+        message: '获取失败',
+        error: error.message
+      });
+    }
+  }
+  
+
+  /**
    * 根据历史人物ID获取模型
    * @param {Object} req 请求对象
    * @param {Object} res 响应对象
@@ -359,6 +385,38 @@ class HistoricalFigureModelController {
     try {
       const { figureId } = req.params;
       const models = await HistoricalFigureModelService.getModelsByFigureId(figureId);
+      
+      res.json({
+        code: 200,
+        message: '获取成功',
+        data: models
+      });
+    } catch (error) {
+      console.error('根据历史人物ID获取模型失败:', error);
+      res.status(500).json({
+        code: 500,
+        message: '获取失败',
+        error: error.message
+      });
+    }
+  }
+
+    /**
+   * 根据历史人物ID获取模型（简要信息）
+   * @param {Object} req 请求对象
+   * @param {Object} res 响应对象
+   */
+  static async getModelsByFigureIdBrief(req, res) {
+    try {
+      const { figureId } = req.params;
+      const models = await HistoricalFigureModelService.getModelsByFigureIdBrief(figureId);
+      
+      if (!models) {
+        return res.status(404).json({
+          code: 404,
+          message: '模型不存在'
+        });
+      }
       
       res.json({
         code: 200,

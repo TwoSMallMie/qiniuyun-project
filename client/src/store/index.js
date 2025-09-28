@@ -14,6 +14,15 @@ export default new Vuex.Store({
 
     /**下拉菜单选中项*/
     selectedModel: { value: 0, label: '请选择' },
+
+    /* 导航项，跟 chatView 保持一致 */
+    sideBarNavItems: [
+      { value: 'chat', icon: 'newChat', text: '聊天' },
+      { value: 'historicalFiguresMarket', icon: 'history', text: '历史人物广场' }
+    ],
+
+    /** 当前选中的导航项 */
+    activeNavValue: null,
   },
   getters: {
   },
@@ -38,6 +47,24 @@ export default new Vuex.Store({
      */
     selectedModel_set(state, value) {
       state.selectedModel = value;
+    },
+
+    /**
+     * 设置当前选中的导航项
+     * @param state 状态
+     * @param {string} value 值
+     */
+    activeNavValue_set(state, value) {
+      state.activeNavValue = value;
+    },
+
+    /**
+     * 切换导航项
+     * @param state 状态
+     * @param {string} value 值
+     */
+    activeNavValue_toggle(state, value) {
+      state.activeNavValue = value;
     },
   },
   actions: {

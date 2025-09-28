@@ -8,6 +8,8 @@
       @pauseSpeech="onPauseSpeech_pause"
       @replaySpeech="onReplaySpeech_replay"
       @reThinking="onReThinking_do"
+      @translate="onTranslate_do"
+      @translateRestore="onTranslateRestore_do"
     >
     </ChatDialog>
 
@@ -25,6 +27,7 @@
 
 <script>
 import { mapState, mapMutations } from 'vuex';
+import { Message } from 'element-ui';
 
 import request from '@/utils/request';
 import { createChatResult } from '@/views/chatView/chatResult';
@@ -48,6 +51,12 @@ export default {
 
       /**请求取消控制器*/
       chatAbortController: null,
+
+      /**翻译读取器*/
+      translateReader: null,
+
+      /**请求取消控制器*/
+      translateAbortController: null,
 
       /**是否在聊天*/
       isChat: false,
@@ -91,10 +100,15 @@ export default {
       chatResult_setByIndex: 'chatView/chatResult_setByIndex',
       chatResult_push: 'chatView/chatResult_push',
       chatResult_splice: 'chatView/chatResult_splice',
+      chatResult_clear: 'chatView/chatResult_clear',
+      chatResult_setContentByIndex: 'chatView/chatResult_setContentByIndex',
+      chatResult_setAudioByIndex: 'chatView/chatResult_setAudioByIndex',
+      chatResult_setAttrByIndex: 'chatView/chatResult_setAttrByIndex',
       audioMap_setByIndex: 'chatView/audioMap_setByIndex',
       audioMap_deleteByIndex: 'chatView/audioMap_deleteByIndex',
       audioMap_getByIndex: 'chatView/audioMap_getByIndex',
       audioMap_clear: 'chatView/audioMap_clear',
+
     }),
     /***************************************************************
      * 外部调用函数集合 func
@@ -120,11 +134,18 @@ export default {
      ***************************************************************/
     /**
      * 初始化一些聊天相关数据
+     * @param {'all' | 'chat' | 'translate'} type 初始化类型，可选值为'all'（初始化所有数据）或'chat'（仅初始化聊天相关数据）
      */
-    initChatData() {
-      this.isChat = false; // 标记为未在聊天
-      this.chatReader = null; // 清除读取器
-      this.chatAbortController = null; // 清除取消控制器
+    initChatData(type='all') {
+      if (type === 'all' || type === 'chat') {
+        this.isChat = false; // 标记为未在聊天
+        this.chatReader = null; // 清除读取器
+        this.chatAbortController = null; // 清除取消控制器
+      }
+      if (type === 'all' || type === 'translate') {
+        this.translateReader = null; // 清除读取器
+        this.translateAbortController = null; // 清除取消控制器
+      }
     },
 
 
@@ -163,7 +184,7 @@ export default {
           "role": "system",
           "content": [{
             type: 'text',
-            text: '这是一个利用 AI 来做角色扮演的网页，你将扮演一个角色与用户进行沟通，其常用词，思维方式，情绪，社会经验，及要求如下：',
+            text: '这是一个利用 AI 来做角色扮演的网页，你将扮演一个角色与用户进行沟通，其常用词，思维方式，情绪，社会经验，回答文本不需要使用括号描述动作和情绪，及要求如下：',
           }]
           .concat(Object.keys(this.selectedModel.prompt).map(key=>({
             type: 'text',
@@ -256,11 +277,7 @@ export default {
               }
 
               // 拼接回答内容, 实时更新回答内容
-              let chatResultContent = this.chatResult[index].content;
-              this.chatResult_setByIndex([index, {
-                ...this.chatResult[index],
-                content: chatResultContent.concat(obj.choices[0].delta.content || '')
-              }]);
+              this.chatResult_setContentByIndex([index, this.chatResult[index].content.concat(obj.choices[0].delta.content || '')]);
             }
           }
 
@@ -285,7 +302,7 @@ export default {
 
       // 若无响应或响应无body，视为请求失败
       if (!response || !response.body) {
-        this.initChatData(); // 重置聊天状态
+        this.initChatData('chat'); // 重置聊天状态
         this.chatResult_splice([-1]); //删除
         this.chatResult_push(createChatResult('assistant', '⚠️ 请求失败或已取消', {reThinking: true})); // 添加错误消息
         return;
@@ -300,12 +317,16 @@ export default {
         await processStreamData.call(this, response, index, ()=>this.ChatDialogToBottom());
 
         // 读取完成,添加audio,允许copy,和重新加载
-        this.chatResult_setByIndex([index, {
-          ...this.chatResult[index],
-          audio: 'play',
-          copy: true,
-          reThinking: true,
-        }]);
+        this.chatResult_setByIndex([index, createChatResult(
+          this.chatResult[index].role,
+          this.chatResult[index].content,
+          {
+            audio: 'play',
+            copy: true,
+            reThinking: true,
+            translate: 'false',
+          }
+        )]);
       }
       catch(e) {
         // 读取失败
@@ -316,7 +337,7 @@ export default {
       }
       
       // 聊天结束，重置状态
-      this.initChatData();
+      this.initChatData('chat');
     },
 
     /**
@@ -409,7 +430,7 @@ export default {
       }
 
       // 进行请求，并检查responce，responce为null，表示请求失败，不必后续进程
-      const response = await requestTextToSpeech(text, 'qiniu_zh_male_tcsnsf');
+      const response = await requestTextToSpeech(text, 'qiniu_zh_male_wncwxz');
       
       if (!response) {
         return null;
@@ -446,28 +467,19 @@ export default {
         // }
         
         // 结束播放，将svgDividerType_1 改为play
-        this.chatResult_setByIndex([idx, {
-          ...this.chatResult[idx],
-          audio: 'play'
-        }]);
+        this.chatResult_setAudioByIndex([idx, 'play']);
       };
 
       // 挂载添加暂停播放的事件
       audio.onpause = () => {
         // 暂停播放，将svgDividerType_1 改为replay
-        this.chatResult_setByIndex([idx, {
-          ...this.chatResult[idx],
-          audio: 'replay'
-        }]);
+        this.chatResult_setAudioByIndex([idx, 'replay']);
       };
 
       // 挂载添加播放事件
       audio.onplay = () => {
         // 播放中，将svgDividerType_1 改为pause
-        this.chatResult_setByIndex([idx, {
-          ...this.chatResult[idx],
-          audio: 'pause'
-        }]);
+        this.chatResult_setAudioByIndex([idx, 'pause']);
       };
     },
 
@@ -486,7 +498,7 @@ export default {
       }
 
       // 重置聊天状态
-      this.initChatData();
+      this.initChatData('chat');
     },
 
     /**
@@ -504,6 +516,97 @@ export default {
       this.audioMap_clear();
     },
 
+    /**
+     * 翻译
+     * @param idx 消息索引
+     */
+    async translate(idx) {
+      /**
+       * 发送请求
+       * @param content 拟翻译内容
+       * @returns {Promise<Response>} 响应对象
+       */
+      async function toRequest(content) {
+        let response; // 保存响应对象
+
+        const systemPrompt = [{
+          "role": "system",
+          "content": [{
+            type: 'text',
+            text: '你是精通中国古文的翻译机器人，我将给你一段古文，要求将它翻译成现代汉语白话文，仅输出翻译结果',
+          }]
+        }]
+
+        // 设置请求体
+        const requestBody = {
+          search: this.isSearch,
+          messages: systemPrompt
+          .concat({
+            "role": 'user',
+            "content": content,
+          })
+        };
+
+        // 进行请求
+        try {
+          response = await request({
+            url: '/api/qiniu/chat',
+            method: 'POST',
+            data: requestBody,
+          });
+        } 
+        catch (err) {
+          if (err.name === 'AbortError') {
+            console.log('请求已取消');
+            return {};
+          }
+          throw err;
+        }
+
+        return response;
+      }
+
+      // 请求获取翻译结果
+      this.chatResult_setAttrByIndex([idx, 'translate', 'loading']);
+
+      let response;
+      try {
+        response = await toRequest.call(this, this.chatResult[idx].content);
+      }
+      catch(e) {
+        console.error('翻译异常:', e);
+        // 若翻译异常，清空翻译内容
+        this.chatResult_setAttrByIndex([idx, 'modernContent', '']);
+        this.chatResult_setAttrByIndex([idx, 'translate', 'false']);
+        Message({
+          showClose: true,
+          message: '网络异常，请重试',
+          type: 'error'
+        });
+        return;
+      }
+      
+      
+      // 获取翻译结果
+      try {
+        const modernContent = response.choices[0].message.content;
+        this.chatResult_setAttrByIndex([idx, 'modernContent', modernContent]);
+        this.chatResult_setAttrByIndex([idx, 'translate', 'true']);
+      }
+      catch(e) {
+        console.error('翻译异常:', e);
+        // 若翻译异常，清空翻译内容
+        this.chatResult_setAttrByIndex([idx, 'translate', 'false']);
+        this.chatResult_setAttrByIndex([idx, 'modernContent', '']);
+        Message({
+          showClose: true,
+          message: '翻译异常，请重试',
+          type: 'error'
+        });
+        return;
+      }
+    },
+
 
     /***************************************************************
      * 事件函数集合 onevent
@@ -515,20 +618,15 @@ export default {
      */
     async onTextToSpeech_do(text, idx) {
       // 转换前,设置为loading
-      this.chatResult_setByIndex([idx, {
-        ...this.chatResult[idx],
-        audio: 'loading'
-      }]);
+      this.chatResult_setAudioByIndex([idx, 'loading']);
 
       // 转为文本转语音
-      const audio = await this.QiniuTextToSpeech(text);
+      const cleanText = text.replace(/\([^)]*\)|（[^）]*）/g, ''); // 删除文本里的括号及其内容包括中文的括号
+      const audio = await this.QiniuTextToSpeech(cleanText);
 
       if (!audio) {
         // 转换失败,设置为play
-        this.chatResult_setByIndex([idx, {
-          ...this.chatResult[idx],
-          audio: 'play'
-        }]);
+        this.chatResult_setAudioByIndex([idx, 'play']);
         return;
       }
 
@@ -539,10 +637,7 @@ export default {
       audio.play();
 
       // 转换完成,设置为pause
-      this.chatResult_setByIndex([idx, {
-        ...this.chatResult[idx],
-        audio: 'pause'
-      }]);
+      this.chatResult_setAudioByIndex([idx, 'pause']);
 
       // 存储音频资源
       this.audioMap_setByIndex([idx, audio]);
@@ -561,10 +656,7 @@ export default {
       }
       
       // 调整状态为replay
-      this.chatResult_setByIndex([idx, {
-        ...this.chatResult[idx],
-        audio: 'replay'
-      }]);
+      this.chatResult_setAudioByIndex([idx, 'replay']);
     },
 
     /**
@@ -579,10 +671,7 @@ export default {
       }
       
       // 调整状态为pause
-      this.chatResult_setByIndex([idx, {
-        ...this.chatResult[idx],
-        audio: 'pause'
-      }]);
+      this.chatResult_setAudioByIndex([idx, 'pause']);
     },
 
     /**
@@ -632,6 +721,32 @@ export default {
           this.ChatDialogToBottom();
         });
       }
+    },
+
+    /**
+     * 点击翻译
+     * @param idx 消息索引
+     */
+    async onTranslate_do(idx) {
+      console.log('点击翻译', idx);
+
+      // 若已完成翻译了，则显示翻译文章
+      if (this.chatResult[idx].translate === 'true') {
+        return;
+      }
+
+      this.translate(idx);
+
+      this.initChatData('translate');
+    },
+
+    /**
+     * 点击翻译恢复
+     * @param idx 要翻译恢复的消息的下标
+     */
+    onTranslateRestore_do(idx) {
+      this.chatResult_setAttrByIndex([idx, 'translate', 'false']);
+      this.chatResult_setAttrByIndex([idx, 'modernContent', '']);
     },
     
 
@@ -803,11 +918,9 @@ export default {
     this.cleanup_content_observer();
     this.cleanup_browser_size_listener();
 
-    // 取消聊天
-    this.stopChat();
-
-    // 取消可能的语音播放
-    this.stopAudio();
+    this.stopChat();// 取消聊天
+    this.chatResult_clear();// 清空聊天结果
+    this.stopAudio();// 取消可能的语音播放
   },
 }
 </script>

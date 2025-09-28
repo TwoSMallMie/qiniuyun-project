@@ -1,8 +1,9 @@
+
 export default {
   namespaced: true,
   state: {
     /**聊天文本内容*/
-    chatText: '你是谁？今天是几年几月几号？v-if和v-show的区别',
+    chatText: '你对酒是什么情感？',
     // chatText: '',
 
     /**聊天结果*/
@@ -33,7 +34,7 @@ export default {
      * @param {object} args[1] 值
      */
     chatResult_setByIndex(state, [index, value]) {
-      state.chatResult[index] = Object.assign({}, value);
+      state.chatResult[index] = value;
       state.chatResult.splice();
     },
     /**
@@ -52,6 +53,51 @@ export default {
     chatResult_splice(state, args) {
       state.chatResult.splice(...args);
     },
+    /**
+     * 设置聊天结果内容
+     * @param state 状态
+     * @param {number[]} args 参数
+     * @param {number} args[0] 索引
+     * @param {string} args[1] 值
+     */
+    chatResult_setContentByIndex(state, [index, value]) {
+      state.chatResult[index].content = value;
+      // 强制触发数组更新以确保视图重新渲染
+      state.chatResult.splice(index, 1, state.chatResult[index]);
+    },
+    /**
+     * 设置聊天的audio属性
+     * @param state 状态
+     * @param {number[]} args 参数
+     * @param {number} args[0] 索引
+     * @param {'none' | 'play' | 'loading' | 'pause' | 'replay'} args[1] 值
+     */
+    chatResult_setAudioByIndex(state, [index, value]) {
+      state.chatResult[index].audio = value;
+      // 强制触发数组更新以确保视图重新渲染
+      state.chatResult.splice(index, 1, state.chatResult[index]);
+    },
+    /**
+     * 设置聊天结果的属性
+     * @param state 状态
+     * @param {number[]} args 参数
+     * @param {number} args[0] 索引
+     * @param {string} args[1] 属性名
+     * @param {*} args[2] 值
+     */
+    chatResult_setAttrByIndex(state, [index, attr, value]) {
+      state.chatResult[index][attr] = value;
+      // 强制触发数组更新以确保视图重新渲染
+      state.chatResult.splice(index, 1, state.chatResult[index]);
+    },
+    /**
+     * 清空聊天结果
+     * @param state 状态
+     */
+    chatResult_clear(state) {
+      state.chatResult = [];
+    },
+
 
 
     /**

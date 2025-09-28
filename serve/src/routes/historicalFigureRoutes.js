@@ -48,8 +48,14 @@ router.get('/figures-with-models', HistoricalFigureController.getFiguresWithMode
 // 获取所有模型
 router.get('/models', HistoricalFigureModelController.getAllModels);
 
+// 根据模型ID获取模型
+router.get('/models/id/:id', HistoricalFigureModelController.getModelById);
+
 // 根据历史人物ID获取模型
 router.get('/models/figureId/:figureId', HistoricalFigureModelController.getModelsByFigureId);
+
+// 根据历史人物ID获取模型（简要信息）
+router.get('/models/figureId/brief/:figureId', HistoricalFigureModelController.getModelsByFigureIdBrief);
 
 // 根据随机的历史人物ID获取模型
 router.get('/models/random', HistoricalFigureModelController.getModelByRandomFigureId);

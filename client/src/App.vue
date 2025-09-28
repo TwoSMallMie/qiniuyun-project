@@ -18,8 +18,8 @@
         >
           <svg
             style="transform: rotate(180deg)"
-            width="28"
-            height="28"
+            width="24"
+            height="24"
             viewBox="0 0 28 28"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
@@ -37,6 +37,7 @@
         <sideBarNav
           v-if="!collapsed.nowView"
           :value="sideBarNavItems"
+          :activeValue="activeNavValue"
           @select="onSelect_nav"
         />
       </div>
@@ -52,8 +53,8 @@
           @click="onClick_toggleSidebar"
         >
           <svg
-            width="28"
-            height="28"
+            width="24"
+            height="24"
             viewBox="0 0 28 28"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
@@ -98,23 +99,21 @@ export default {
       },
       /** 窗口宽度 */
       windowWidth: window.innerWidth,
-      /* 导航项，跟 chatView 保持一致 */
-      sideBarNavItems: [
-        { value: 'chat', icon: 'newChat', text: '聊天' },
-        { value: 'historicalFiguresMarket', icon: 'history', text: '历史人物' }
-      ],
     }
   },
   computed: {
     ...mapState({
       modelDropdownItems: state => state.modelDropdownItems, // 下拉列表选项
       selectedModel: state => state.selectedModel, // 下拉菜单选中项
+      activeNavValue: state => state.activeNavValue, // 当前选中的导航项
+      sideBarNavItems: state => state.sideBarNavItems, // 导航项
     }),
   },
   methods: {
     ...mapMutations({
       modelDropdownItems_set: 'modelDropdownItems_set', // 设置下拉列表选项
       selectedModel_set: 'selectedModel_set', // 设置下拉菜单选中项
+      activeNavValue_set: 'activeNavValue_set', // 设置当前选中的导航项
     }),
     
     /**
@@ -132,16 +131,17 @@ export default {
 
     /* 响应式断点检测 */
     checkAutoCollapse() {
-      const old = this.windowWidth
-      const now = window.innerWidth
-      this.windowWidth = now
+      const old = this.windowWidth;
+      const now = window.innerWidth;
+      const threshold = 700;
+      this.windowWidth = now;
 
-      if (old > 600 && now <= 600) {
+      if (old > threshold && now <= threshold) {
         /* 大屏 -> 小屏 */
         this.collapsed.bigView = this.collapsed.nowView
         this.collapsed.nowView = true
         this.collapsed.viewType = 'small'
-      } else if (now > 600 && old <= 600) {
+      } else if (now > threshold && old <= threshold) {
         /* 小屏 -> 大屏 */
         this.collapsed.smallView = true
         this.collapsed.nowView = this.collapsed.bigView
@@ -183,6 +183,11 @@ export default {
         default:
           break
       }
+
+      this.activeNavValue_set(value); // 设置当前选中的导航项
+      // 如果是在小屏模式，收起侧边栏
+      if (this.collapsed.viewType === 'small') 
+        this.collapsed.nowView = !this.collapsed.nowView;
     }
   },
   mounted() {
@@ -193,8 +198,9 @@ export default {
     }
     window.addEventListener('resize', this.checkAutoCollapse);
 
-    // 默认跳到聊天页（原来 mounted 里的逻辑）
+    // 默认跳到聊天页
     this.$router.push('/chat');
+    this.activeNavValue_set('chat');
 
     // 初始化下拉列表选项
     (async function() {
@@ -217,7 +223,7 @@ export default {
 }
 </script>
 
-<style>
+<style scoped>
 /* ===== 迁移过来的样式 ===== */
 #app {
   display: flex;
@@ -259,7 +265,8 @@ export default {
   flex-shrink: 0; /* 防止top-content被压缩 */
 }
 .container {
-  flex: 1;
+  /* flex: 1; */
+  height: calc(100% - 44px);
 }
 .toggle-btn {
   background: none;
@@ -277,7 +284,7 @@ export default {
   padding: 0;
 }
 /* 小屏遮罩 */
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   .sidebar-mask {
     position: absolute;
     z-index: 20;
@@ -288,7 +295,37 @@ export default {
   }
 }
 
-/* 原来 App.vue 的变量继续保留 */
+
+</style>
+
+<style>
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* 修改全局滚动条样式 */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: var(--bg-color);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #bfbfbf;
+}
+
+
+/* 变量 */
 :root {
   --blue-3: #003a8c;
   --blue-2: #1890ff;
@@ -337,9 +374,5 @@ export default {
   --bg-color: #f5f5f5;
   --bg--color-deep: #eaeaea;
 }
-
-body {
-  margin: 0;
-  padding: 0;
-}
 </style>
+

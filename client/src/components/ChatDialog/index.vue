@@ -12,7 +12,12 @@
         <div v-if="msg.thinking" class="chat-bubble loading-bubble">
           <span class="loader"></span>
         </div>
-        <div v-else class="chat-bubble" v-html="msg.role !== 'user' ? renderContent_assistant(msg.content) : renderContent_user(msg.content)"></div>
+        <div v-if="!msg.thinking" class="chat-bubble" v-html="msg.role !== 'user' ? renderContent_assistant(msg.content) : renderContent_user(msg.content)"></div>
+        <div v-if="msg.modernContent !== ''" style="max-width:calc(80%);">
+          <br />
+          <div style="font-size:14px;">翻译结果：</div>
+          <div v-if="!msg.thinking" class="chat-modern" v-html="msg.role !== 'user' ? renderContent_assistant(msg.modernContent) : renderContent_user(msg.content)"></div>
+        </div>
         <div class="chat-divider">
           <!-- audio -->
           <svg 
@@ -67,6 +72,28 @@
             <path d="M192 512c0-176.32 144.992-320 324.8-320 106.304 0 200.608 50.304 259.84 128H672v64h224V160h-64v127.2A389.792 389.792 0 0 0 516.8 128C302.432 128 128 299.52 128 512s174.464 384 388.8 384c183.552 0 337.728-125.76 378.336-295.328l-62.24-14.88C799.136 726.688 670.592 832 516.736 832 336.992 832 192 688.32 192 512z" fill="#707070"></path>
           </svg>
 
+          <!-- 翻译 -->
+          <div
+            v-if="msg.role === 'assistant' && msg.translate === 'false'"
+            class="div-icon"
+            @click="onClick_translate(idx)"
+          >
+            <div>译</div>
+          </div>
+          <svg 
+            v-else-if="msg.role === 'assistant' && msg.translate === 'loading'"
+            class="chat-divider-svg rotating"
+            viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M753.365333 270.634667a46.08 46.08 0 0 1-61.226666 3.498666 220.970667 220.970667 0 0 0-14.293334-10.581333 298.752 298.752 0 0 0-441.770666 362.666667 298.666667 298.666667 0 0 0 571.904-74.282667A45.696 45.696 0 0 1 853.333333 512h3.328a37.333333 37.333333 0 0 1 37.12 41.301333 384 384 0 1 1-151.936-348.970666c2.56 1.92 5.418667 4.181333 8.618667 6.826666a40.192 40.192 0 0 1 2.901333 59.477334z" fill="#707070"></path>
+          </svg>
+          <div
+            v-else-if="msg.role === 'assistant' && msg.translate === 'true'"
+            class="div-icon"
+            @click="onClick_translateRestore(idx)"
+          >
+            <div>原</div>
+          </div>
         </div>
       </div>
     </div>
@@ -77,6 +104,7 @@
 import { marked } from 'marked';
 import copyToClipboard from '@/utils/copyToClipboard/index.js'; //这里引用了copyToClipboard函数
 import { debounce } from '@/utils/helper';
+import { Message } from 'element-ui';
 
 
 export default {
@@ -247,9 +275,13 @@ export default {
           isCopyToClipboard = this.copyToClipboard(msg.content);
         }
       }
-      console.log(isCopyToClipboard);
       
-      alert(isCopyToClipboard ? '成功复制到粘贴板' : '复制失败，请重试');
+      if (isCopyToClipboard) {
+        Message.success('复制完成！');
+      }
+      else {
+        Message.error('复制失败，请重试');
+      }
     }, 256),
 
     /**
@@ -258,6 +290,23 @@ export default {
      */
     onClick_reThinking(idx) {
       this.$emit('reThinking', idx);
+    },
+
+    /**
+     * 点击翻译
+     * @param idx 要翻译的消息的下标
+     */
+    onClick_translate(idx) {
+      // this.$tooltip.success('操作成功完成！')
+      this.$emit('translate', idx);
+    },
+
+    /**
+     * 点击翻译恢复
+     * @param idx 要翻译恢复的消息的下标
+     */
+    onClick_translateRestore(idx) {
+      this.$emit('translateRestore', idx);
     },
 
 
@@ -353,6 +402,7 @@ export default {
   color: #222;
   word-break: break-word;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  line-height: 1.5;
 }
 .chat-row.user .chat-bubble,
 .chat-row.error .chat-bubble {
@@ -414,12 +464,40 @@ export default {
   height: 18px;
   margin: 8px 4px 0px 4px;
   padding: 4px;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   transition: background-color 0.2s;
 }
 .chat-divider-svg:hover {
   background-color: var(--bg-color);
+}
+.chat-modern {
+  padding: 0px 12px;
+  font-size: 12px;
+  color: #222;
+  word-break: break-word;
+}
+.div-icon {
+  margin: 8px 4px 0px 4px;
+  padding: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  color: #707070;
+  font-size: 12px;
+  border-radius: 6px;
+  font-weight: bold;
+}
+.div-icon:hover {
+  background-color: var(--bg-color);
+}
+.div-icon>div {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid #707070;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
 }
 /* 隐藏所有滚动条（适用于现代浏览器） */
 .hide_scrolling {
@@ -437,7 +515,7 @@ export default {
 
 /* 添加旋转动画类 */
 .rotating {
-  background-color: none !important;
+  background-color: #ffffff00 !important;
   animation: spin 1s linear infinite;
 }
 </style>
